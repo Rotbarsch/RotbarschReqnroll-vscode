@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile-client",
+      "type": "npm",
+      "script": "compile",
+      "path": "src/client/",
+      "problemMatcher": "$tsc",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "publish-reqnroll-lsp-debug",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "publish",
+        "src/server/Reqnroll.LanguageServer/Reqnroll.LanguageServer.csproj",
+        "-c",
+        "Debug",
+        "-r",
+        "win-x64",
+        "--self-contained",
+        "true"
+      ],
+      "dependsOn": ["compile-client"],
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

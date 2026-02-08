@@ -1,0 +1,13 @@
+**/*.ts
+**/*.cs
+**/*.csproj
+**/obj/**
+**/Debug/**
+client/src/**
+server/bin/**/net*/
+.vscode/**
+.vscode-test/**
+**/*.map
+.gitignore
+tsconfig.json
+node_modules/@types/**
