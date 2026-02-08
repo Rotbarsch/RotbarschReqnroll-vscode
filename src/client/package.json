@@ -1,0 +1,53 @@
+{
+  "name": "rotbarsch-reqnroll-vscode",
+  "displayName": "Rotbarsch.Reqnroll",
+  "description": "Reqnroll support for VS Code",
+  "version": "0.0.1",
+  "publisher": "Rotbarsch",
+  "license": "MIT",
+  "icon": "images/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rotbarsch/RotbarschReqnroll-vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "os": ["win32"],
+  "activationEvents": [
+    "onLanguage:reqnroll-feature"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "reqnroll-feature",
+        "aliases": ["Reqnroll Feature", "feature"],
+        "extensions": [".feature"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "reqnroll-feature",
+        "scopeName": "source.reqnroll",
+        "path": "./syntaxes/reqnroll.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Reqnroll",
+      "properties": {}
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

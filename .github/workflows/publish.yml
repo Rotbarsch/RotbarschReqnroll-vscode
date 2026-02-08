@@ -1,0 +1,63 @@
+name: Publish VS Code Extension
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Extract version from tag (v1.2.3 → 1.2.3)
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      # Build Server
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Build C# language server
+        run: dotnet publish src/server/Reqnroll.LanguageServer/Reqnroll.LanguageServer.csproj -c Release -r win-x64 --self-contained true
+
+      # Build Client
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install node dependencies
+        working-directory: src/client
+        run: npm install
+
+      - name: Build extension client
+        working-directory: src/client
+        run: npm run compile
+
+      # Temporarily update version
+      - name: Set version for publish
+        working-directory: src/client
+        shell: pwsh
+        run: |
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version
+
+      # Package extension into vsix
+      - name: Install vsce
+        working-directory: src/client
+        run: |
+          npm install -g @vscode/vsce
+          vsce package
+
+      # Publish
+      - name: Publish extension
+        working-directory: src/client
+        run: vsce publish --pat ${{ secrets.VisualStudioMarketplacePat }}
