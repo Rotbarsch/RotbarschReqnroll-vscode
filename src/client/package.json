@@ -1,0 +1,52 @@
+{
+  "name": "rotbarsch-reqnroll-vscode",
+  "displayName": "Rotbarsch Reqnroll VS Code",
+  "description": "Reqnroll support for VS Code",
+  "version": "0.0.2",
+  "publisher": "Rotbarsch",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "activationEvents": [
+    "onLanguage:reqnroll-feature"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "reqnroll-feature",
+        "aliases": ["Reqnroll Feature", "feature"],
+        "extensions": [".feature"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "reqnroll-feature",
+        "scopeName": "source.reqnroll",
+        "path": "./syntaxes/reqnroll.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "Reqnroll",
+      "properties": {
+        "reqnroll.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable CodeLens for running Reqnroll tests"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

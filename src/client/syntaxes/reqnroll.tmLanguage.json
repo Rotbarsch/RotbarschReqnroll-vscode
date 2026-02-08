@@ -1,0 +1,77 @@
+{
+  "name": "Reqnroll Feature",
+  "scopeName": "source.reqnroll",
+  "patterns": [
+    { "include": "#keywords" },
+    { "include": "#tags" },
+    { "include": "#parameters" },
+    { "include": "#strings" },
+    { "include": "#comments" }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.reqnroll",
+          "match": "^\\s*(Feature|Background|Examples)\\s*:"
+        },
+        {
+          "name": "keyword.control.reqnroll",
+          "match": "^\\s*(Scenario Outline|Scenario)\\s*:"
+        },
+        {
+          "name": "keyword.control.reqnroll",
+          "match": "^\\s*(Given|When|Then|And|But)\\s+"
+        }
+      ]
+    },
+    "tags": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.reqnroll",
+          "match": "@[a-zA-Z0-9_]+"
+        }
+      ]
+    },
+    "parameters": {
+      "patterns": [
+        {
+          "name": "variable.other.readwrite.reqnroll",
+          "match": "<[^>]+>"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.triple.reqnroll",
+          "begin": "\"\"\"",
+          "end": "\"\"\"",
+          "patterns": [
+            {
+              "include": "#parameters"
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.double.reqnroll",
+          "begin": "\"",
+          "end": "\""
+        },
+        {
+          "name": "string.quoted.single.reqnroll",
+          "begin": "'",
+          "end": "'"
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.reqnroll",
+          "match": "^(?!\\s*(@|Feature|Scenario|Scenario Outline|Background|Examples|Given|When|Then|And|But|\\||\"\"\"|\"|')).*$"
+        }
+      ]
+    }
+  }
+}
