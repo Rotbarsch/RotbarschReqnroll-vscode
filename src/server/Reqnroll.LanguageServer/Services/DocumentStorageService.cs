@@ -32,4 +32,17 @@ public class DocumentStorageService
     {
         _documents.TryRemove(uri.ToString(), out _);
     }
+
+    public string? GetFullFilePath(string requestUri)
+    {
+        var uri = new Uri(requestUri);
+        var path = Uri.UnescapeDataString(uri.AbsolutePath);
+
+        if (path.StartsWith("/") &&
+            path.Length > 2 &&
+            path[2] == ':')
+            path = path[1..];
+
+        return Path.GetFullPath(path);
+    }
 }

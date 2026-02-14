@@ -7,6 +7,10 @@ import {
   ServerOptions,
   TransportKind
 } from 'vscode-languageclient/node';
+import { ReqnrollTestDiscoveryController } from './ReqnrollTestDiscoveryController';
+import { ReqnrollTestRunnerController } from './ReqnrollTestRunnerController';
+import { DotnetBuildController } from './DotnetBuildController';
+import { DotnetVersionChecker } from './DotnetVersionChecker';
 
 let client: LanguageClient;
 
@@ -42,7 +46,11 @@ function getServerCommand(context: vscode.ExtensionContext): { command: string; 
   return { command: serverPath, args };
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  if (!await DotnetVersionChecker.checkVersion()) {
+    return;
+  }
+
   const server = getServerCommand(context);
 
   const serverOptions: ServerOptions = {
@@ -68,7 +76,26 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   context.subscriptions.push(client);
-  client.start();
+  await client.start();
+  
+  // Setup test discovery
+  const discoveryController = new ReqnrollTestDiscoveryController(
+    client,
+    'rotbarsch.reqnrollController',
+    'Reqnroll'
+  );
+  const discoveryWatcher = discoveryController.setupTestDiscovery();
+  
+  // Setup test runner
+  const discoveryControllerInstance = discoveryController.getController();
+  const runnerController = new ReqnrollTestRunnerController(client);
+  const runProfile = runnerController.activate(discoveryControllerInstance);
+  
+  // Setup dotnet build manager
+  const buildController = new DotnetBuildController(client);
+  const buildWatcher = buildController.setupBuildTriggers();
+  
+  context.subscriptions.push(discoveryControllerInstance, discoveryWatcher, runProfile, buildWatcher);
 }
 
 export function deactivate(): Thenable<void> | undefined {

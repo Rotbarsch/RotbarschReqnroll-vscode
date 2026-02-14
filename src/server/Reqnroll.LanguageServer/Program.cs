@@ -1,9 +1,13 @@
 using OmniSharp.Extensions.LanguageServer.Server;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using OmniSharp.Extensions.LanguageServer.Protocol.General;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using Reqnroll.LanguageServer.Handlers;
 using Reqnroll.LanguageServer.Services;
+using Reqnroll.LanguageServer.Models.TestDiscovery;
+using Reqnroll.LanguageServer.Models.TestRunner;
+using Reqnroll.LanguageServer.Models.DotnetWatch;
 
 #if DEBUG
 if (args.Contains("--wait-for-debugger"))
@@ -21,6 +25,8 @@ if (args.Contains("--wait-for-debugger"))
 
 Console.Error.WriteLine("Starting Rotbarsch.Reqnroll Language Server...");
 
+IServiceProvider? serviceProvider = null;
+
 var server = await LanguageServer.From(options =>
 {
     options
@@ -31,14 +37,36 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton<DocumentStorageService>();
             services.AddSingleton<ReqnrollBindingStorageService>();
             services.AddSingleton<LanguageServerProtocolRequestService>();
+            services.AddSingleton<VsCodeOutputLogger>();
+            services.AddSingleton<ReqnrollTestRunnerService>();
+            services.AddSingleton<ReqnrollTestDiscoveryService>();
+            services.AddSingleton<DotnetBuildService>();
+            services.AddSingleton<DotnetTestService>();
         })
         .WithHandler<ReqnrollTextDocumentSyncHandler>()
         .WithHandler<ReqnrollCompletionHandler>()
         .WithHandler<ReqnrollDocumentFormattingHandler>()
         .WithHandler<ReqnrollHoverHandler>()
         .WithHandler<ReqnrollDocumentSymbolHandler>()
+        .OnRequest<RunTestsParams, List<TestResult>>("rotbarsch.reqnroll/runTests", (request, ct) =>
+        {
+            var runner = serviceProvider?.GetService<ReqnrollTestRunnerService>()!;
+            return runner.HandleRunTestsRequestAsync(request, ct);
+        })
+        .OnRequest<DiscoverTestsParams, List<DiscoveredTest>>("rotbarsch.reqnroll/discoverTests", (request, ct) =>
+        {
+            var discoveryService = serviceProvider?.GetService<ReqnrollTestDiscoveryService>()!;
+            return discoveryService.HandleDiscoverTestsRequestAsync(request, ct);
+        })
+        .OnRequest<StartBuildParams, BuildResult>("rotbarsch.reqnroll/startBuild", (request, ct) =>
+        {
+            var watchService = serviceProvider?.GetService<DotnetBuildService>()!;
+            return watchService.HandleStartWatchRequestAsync(request, ct);
+        })
         .OnInitialize((server, request, token) =>
         {
+            serviceProvider = server.Services;
+            
             var bindingStorageService = server.Services.GetService<ReqnrollBindingStorageService>()!;
 
             server.Window.LogInfo("Rotbarsch.Reqnroll LSP initialized");
@@ -62,6 +90,14 @@ var server = await LanguageServer.From(options =>
         {
             languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP started");
             return Task.CompletedTask;
+        })
+        .OnExit(_ =>
+        {
+            var testResultsPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "rotbarsch.reqnroll", "test_results");
+            if(Directory.Exists(testResultsPath))
+            {
+                Directory.Delete(testResultsPath, true);
+            }
         });
 });
 
