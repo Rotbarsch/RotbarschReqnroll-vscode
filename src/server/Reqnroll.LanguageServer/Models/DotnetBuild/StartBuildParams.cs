@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Reqnroll.LanguageServer.Models.DotnetWatch;
+namespace Reqnroll.LanguageServer.Models.DotnetBuild;
 
 public class StartBuildParams
 {

@@ -19,20 +19,22 @@ export class ReqnrollTestDiscoveryController {
     }
 
     public setupTestDiscovery(): vscode.FileSystemWatcher {
-        // Watch for .feature file changes and discover tests
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*.feature');
+        // Watch for .feature and .feature.cs file changes and discover tests
+        // The .feature.cs files are the generated C# files which contain the actual test methods
+        const watcher = vscode.workspace.createFileSystemWatcher('**/*.feature{,.cs}');
 
-        const discoverTestsForUri = async (uri: vscode.Uri) => {
-            try {
-                const tests = await this.sendDiscoverTestsRequest(uri.toString());
-                this.updateTestItems(uri, tests);
-            } catch (error) {
-                console.error(`Test discovery failed for ${uri.toString()}: ${this.formatRequestError(error)}`);
-            }
-        };
+        // OnFileAdd: Run discovery for that file
+        watcher.onDidCreate(async (uri) => {
+            await this.discoverTestsForFile(uri);
+        });
 
-        watcher.onDidCreate(discoverTestsForUri);
-        watcher.onDidChange(discoverTestsForUri);
+        // OnFileUpdate: Remove all test items associated with that file, rediscover for that file
+        watcher.onDidChange(async (uri) => {
+            this.removeTestItemsForFile(uri);
+            await this.discoverTestsForFile(uri);
+        });
+
+        // OnFileDelete: Delete all test items associated with that file
         watcher.onDidDelete((uri) => {
             this.removeTestItemsForFile(uri);
         });
@@ -40,39 +42,23 @@ export class ReqnrollTestDiscoveryController {
         // Discover tests in all existing feature files
         vscode.workspace.findFiles('**/*.feature').then(async (uris) => {
             for (const uri of uris) {
-                await discoverTestsForUri(uri);
+                await this.discoverTestsForFile(uri);
             }
         });
 
         return watcher;
     }
 
-    private updateTestItems(uri: vscode.Uri, tests: DiscoveredTest[]): void {
-        const uriString = uri.toString();
-        
-        // Remove existing tests for this file (at any level in the hierarchy)
-        this.removeTestItemsForFile(uri);
-
-        // Add new tests for this file
-        // Handle the special case where all files share the same root (namespace)
-        for (const test of tests) {
-            if (test.children && test.children.length > 0) {
-                // This is a namespace node - check if it already exists
-                const existingNamespace = this.controller.items.get(test.id);
-                
-                if (existingNamespace) {
-                    // Namespace exists, add features as children to existing namespace
-                    for (const feature of test.children) {
-                        this.addTestItem(feature, existingNamespace.children);
-                    }
-                } else {
-                    // Namespace doesn't exist, create it with all its children
-                    this.addTestItem(test, this.controller.items);
-                }
-            } else {
-                // Not a hierarchical structure, just add directly
+    private async discoverTestsForFile(uri: vscode.Uri): Promise<void> {
+        try {
+            const tests = await this.sendDiscoverTestsRequest(uri.toString());
+            
+            // Add all discovered tests
+            for (const test of tests) {
                 this.addTestItem(test, this.controller.items);
             }
+        } catch (error) {
+            console.error(`Test discovery failed for ${uri.toString()}: ${this.formatRequestError(error)}`);
         }
     }
 
@@ -83,22 +69,23 @@ export class ReqnrollTestDiscoveryController {
             new vscode.Position(test.range.endLine, test.range.endCharacter)
         );
 
-        // Check if item already exists, if so, delete it first to update
-        const existingItem = parent.get(test.id);
-        if (existingItem) {
-            parent.delete(test.id);
+        // Get or create the test item
+        let item = parent.get(test.id);
+        if (!item) {
+            item = this.controller.createTestItem(test.id, test.label, uri);
+            parent.add(item);
         }
 
-        const item = this.controller.createTestItem(test.id, test.label, uri);
+        // Update item properties
+        item.label = test.label;
         item.range = range;
 
+        // Add children recursively
         if (test.children && test.children.length > 0) {
             for (const child of test.children) {
                 this.addTestItem(child, item.children);
             }
         }
-
-        parent.add(item);
     }
 
     private async sendDiscoverTestsRequest(uri: string): Promise<DiscoveredTest[]> {
@@ -111,7 +98,7 @@ export class ReqnrollTestDiscoveryController {
     private removeTestItemsForFile(uri: vscode.Uri): void {
         const uriString = uri.toString();
         
-        // Recursively find and remove all test items that belong to this file
+        // Remove all test items that belong to this file
         const removeFromCollection = (collection: vscode.TestItemCollection) => {
             const itemsToRemove: string[] = [];
             

@@ -18,56 +18,83 @@ export class ReqnrollTestRunnerController {
 
         const queue: vscode.TestItem[] = [];
         if (request.include) {
-          request.include.forEach((testItem) => queue.push(testItem));
+          // Check for "Run All" special case: Test Explorer passes a test item with empty ID and no children
+          // when the "Run All Tests" button is clicked in the Test Explorer toolbar
+          const hasRunAllMarker = request.include.some(item => item.id === '' && item.children.size === 0);
+          
+          if (hasRunAllMarker) {
+            // "Run All" was triggered - include all tests from the controller
+            controller.items.forEach((testItem) => queue.push(testItem));
+          } else {
+            // Normal test run - include only the selected tests
+            request.include.forEach((testItem) => queue.push(testItem));
+          }
         } else {
+          // No specific tests selected - run all tests
           controller.items.forEach((testItem) => queue.push(testItem));
         }
 
+        // Mark containers as started for UI feedback
         queue.forEach((testItem) => run.started(testItem));
 
-        let results: TestResult[];
-        try {
-          results = await this.sendRunTestsRequest(queue);
-        } catch (error) {
-          const message = this.formatRequestError(error);
-          for (const testItem of queue) {
+        // Extract only leaf test cases (items without children) from the queue
+        const testCases = this.extractLeafTestCases(queue);
+
+        // Mark all leaf test cases as started to show loading indicator
+        testCases.forEach((testItem) => run.started(testItem));
+
+        // Run tests individually and update UI as each completes
+        await Promise.all(testCases.map(async (testItem) => {
+          try {
+            const results = await this.sendRunTestsRequest([testItem]);
+            
+            for (const result of results) {
+              // Append output message if available
+              if (result.message) {
+                run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
+              }
+
+              if (result.passed) {
+                run.passed(testItem);
+              } else {
+                const message = new vscode.TestMessage(result.message ?? 'Test failed');
+                if (result.line !== undefined && testItem.uri) {
+                  message.location = new vscode.Location(
+                    testItem.uri,
+                    new vscode.Position(result.line, 0)
+                  );
+                }
+
+                run.failed(testItem, message);
+              }
+            }
+          } catch (error) {
+            const message = this.formatRequestError(error);
             run.errored(testItem, new vscode.TestMessage(`runTests request failed: ${message}`));
           }
-
-          run.end();
-          return;
-        }
-
-        for (const result of results) {
-          const testItem = this.findTestItemById(queue, result.id);
-          if (!testItem) {
-            continue;
-          }
-
-          // Append output message if available
-          if (result.message) {
-            run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
-          }
-
-          if (result.passed) {
-            run.passed(testItem);
-          } else {
-            const message = new vscode.TestMessage(result.message ?? 'Test failed');
-            if (result.line !== undefined && testItem.uri) {
-              message.location = new vscode.Location(
-                testItem.uri,
-                new vscode.Position(result.line, 0)
-              );
-            }
-
-            run.failed(testItem, message);
-          }
-        }
+        }));
 
         run.end();
       },
       true
     );
+  }
+
+  private extractLeafTestCases(testItems: vscode.TestItem[]): vscode.TestItem[] {
+    const leafTestCases: vscode.TestItem[] = [];
+
+    const collectLeaves = (item: vscode.TestItem) => {
+      // If the item has no children, it's a leaf test case
+      if (item.children.size === 0) {
+        leafTestCases.push(item);
+      } else {
+        // Otherwise, recursively collect from all children
+        item.children.forEach(child => collectLeaves(child));
+      }
+    };
+
+    testItems.forEach(item => collectLeaves(item));
+    return leafTestCases;
   }
 
   private async sendRunTestsRequest(testItems: vscode.TestItem[]): Promise<TestResult[]> {

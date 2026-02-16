@@ -3,8 +3,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using Reqnroll.LanguageServer.Services;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
-using System.Collections.ObjectModel;
-using System.Reflection;
 
 namespace Reqnroll.LanguageServer.Handlers;
 

@@ -1,38 +1,25 @@
-using System;
 using System.Diagnostics;
-using Reqnroll.LanguageServer.Helpers;
-using Reqnroll.LanguageServer.Models.DotnetWatch;
+using System.Threading;
+using Reqnroll.LanguageServer.Models.DotnetBuild;
 
 namespace Reqnroll.LanguageServer.Services;
 
 public class DotnetBuildService
 {
     private readonly VsCodeOutputLogger _logger;
-    private readonly DocumentStorageService _documentStorageService;
     private readonly Dictionary<string, Process> _activeBuilds = new();
-    private readonly Dictionary<string, DateTimeOffset> _recentBuilds = new();
+    private readonly SemaphoreSlim _buildLock = new(1, 1);
 
-    public DotnetBuildService(
-        VsCodeOutputLogger logger,
-        DocumentStorageService documentStorageService)
+    public DotnetBuildService(VsCodeOutputLogger logger)
     {
         _logger = logger;
-        _documentStorageService = documentStorageService;
     }
 
-    public async Task<BuildResult> HandleStartWatchRequestAsync(StartBuildParams request, CancellationToken cancellationToken)
+    public async Task<BuildResult> BuildCsProject(string projectFile, bool forceBuild=false, CancellationToken cancellationToken=default)
     {
-        _logger.LogInfo($"startBuild handler invoked for URI: {request.FeatureFileUri}");
-
-        var featureFilePath = _documentStorageService.GetFullFilePath(request.FeatureFileUri);
-        if (string.IsNullOrEmpty(featureFilePath))
-            return new BuildResult()
-            { Message = "Unable to get path of feature file.", ProjectFile = null, Success = false };
-        var projectFile = ProjectFileFinder.GetProjectFileOfFeatureFile(featureFilePath);
-
-        if (string.IsNullOrEmpty(projectFile))
+        if (string.IsNullOrWhiteSpace(projectFile))
         {
-            var message = $"No project file found for feature file: {featureFilePath}";
+            var message = "Project file path is empty.";
             _logger.LogWarning(message);
             return new BuildResult
             {
@@ -41,22 +28,7 @@ public class DotnetBuildService
             };
         }
 
-        // During start up, every feature file will be sent to this service and thus trigger a build.
-        // In order to avoid multiple builds in parallel, we debounce in a 30 sec interval.
-        if (_recentBuilds.TryGetValue(projectFile, out var lastBuild) &&
-            DateTimeOffset.UtcNow - lastBuild < TimeSpan.FromSeconds(30))
-        {
-            var message = $"Skipping build for project: {projectFile}. Last build was less than 30 seconds ago.";
-            _logger.LogInfo(message);
-            return new BuildResult
-            {
-                Success = true,
-                Message = message,
-                ProjectFile = projectFile
-            };
-        }
-
-        // Start dotnet build process
+        await _buildLock.WaitAsync(cancellationToken);
         try
         {
             var processStartInfo = new ProcessStartInfo
@@ -72,7 +44,6 @@ public class DotnetBuildService
 
             var process = new Process { StartInfo = processStartInfo };
 
-            // Log output and errors
             process.OutputDataReceived += (sender, args) =>
             {
                 if (!string.IsNullOrEmpty(args.Data))
@@ -106,8 +77,6 @@ public class DotnetBuildService
 
             await process.WaitForExitAsync(cancellationToken);
 
-            _recentBuilds[projectFile] = DateTimeOffset.UtcNow;
-
             return new BuildResult
             {
                 Success = process.ExitCode == 0,
@@ -125,6 +94,10 @@ public class DotnetBuildService
                 Message = message,
                 ProjectFile = projectFile
             };
+        }
+        finally
+        {
+            _buildLock.Release();
         }
     }
 }

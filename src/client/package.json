@@ -35,7 +35,15 @@
     ],
     "configuration": {
       "title": "Reqnroll",
-      "properties": {}
+      "properties": {
+        "reqnroll.test.parallelExecutionLimit": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Maximum number of tests that can run in parallel. Default is 5."
+        }
+      }
     }
   },
   "scripts": {

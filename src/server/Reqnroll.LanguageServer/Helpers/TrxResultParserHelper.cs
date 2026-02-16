@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Xml;
 using Reqnroll.LanguageServer.Models.TrxResultParserHelper;
 
@@ -22,7 +19,7 @@ public static class TrxResultParserHelper
         var defaultNamespace = doc.DocumentElement?.NamespaceURI ?? string.Empty;
         nsManager.AddNamespace("trx", defaultNamespace);
 
-        var testDefinitions = new Dictionary<string, (string FullMethodName, string ClassName)>();
+        var testDefinitions = new Dictionary<string, string>();
 
         var unitTests = doc.SelectNodes("//trx:TestDefinitions/trx:UnitTest", nsManager);
         if (unitTests != null)
@@ -39,7 +36,7 @@ public static class TrxResultParserHelper
                     var fullMethodName = string.IsNullOrWhiteSpace(className)
                         ? methodName
                         : $"{className}.{methodName}";
-                    testDefinitions[id] = (fullMethodName, className);
+                    testDefinitions[id] = fullMethodName;
                 }
             }
         }
@@ -56,14 +53,9 @@ public static class TrxResultParserHelper
                 var outcome = result.Attributes?["outcome"]?.Value ?? string.Empty;
                 var stdOut = result.SelectSingleNode("trx:Output/trx:StdOut", nsManager)?.InnerText ?? string.Empty;
 
-                testDefinitions.TryGetValue(testId, out var testDefinition);
+                testDefinitions.TryGetValue(testId, out var fullMethodName);
 
-                parsedResults.Add(new TrxTestCaseResult(
-                    testName,
-                    outcome,
-                    stdOut,
-                    testDefinition.FullMethodName ?? string.Empty,
-                    testDefinition.ClassName ?? string.Empty));
+                parsedResults.Add(new TrxTestCaseResult(testName, outcome, stdOut, fullMethodName ?? string.Empty));
             }
         }
 

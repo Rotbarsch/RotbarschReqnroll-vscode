@@ -1,5 +1,3 @@
-using System.IO;
-
 namespace Reqnroll.LanguageServer.Helpers;
 
 public static class ProjectFileFinder
