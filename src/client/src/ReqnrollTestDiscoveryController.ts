@@ -52,7 +52,7 @@ export class ReqnrollTestDiscoveryController {
     private async discoverTestsForFile(uri: vscode.Uri): Promise<void> {
         try {
             const tests = await this.sendDiscoverTestsRequest(uri.toString());
-            
+
             // Add all discovered tests
             for (const test of tests) {
                 this.addTestItem(test, this.controller.items);
@@ -76,9 +76,20 @@ export class ReqnrollTestDiscoveryController {
             parent.add(item);
         }
 
-        // Update item properties
-        item.label = test.label;
+        // Sanitize label for VS Code Test Explorer: replace all '$(...)' with '{...}'
+        let sanitizedLabel = test.label.replace(/\$\(([^)]+)\)/g, '{$1}');
+        item.label = sanitizedLabel;
         item.range = range;
+
+        // Store ParentId and PickleIndex as tags for later retrieval
+        const tags: vscode.TestTag[] = [];
+        if (test.parentId !== undefined && test.parentId !== null) {
+            tags.push(new vscode.TestTag(`parentId:${test.parentId}`));
+        }
+        if (test.pickleIndex !== undefined && test.pickleIndex !== null) {
+            tags.push(new vscode.TestTag(`pickleIndex:${test.pickleIndex}`));
+        }
+        item.tags = tags;
 
         // Add children recursively
         if (test.children && test.children.length > 0) {
@@ -97,11 +108,11 @@ export class ReqnrollTestDiscoveryController {
 
     private removeTestItemsForFile(uri: vscode.Uri): void {
         const uriString = uri.toString();
-        
+
         // Remove all test items that belong to this file
         const removeFromCollection = (collection: vscode.TestItemCollection) => {
             const itemsToRemove: string[] = [];
-            
+
             collection.forEach((item) => {
                 if (item.uri?.toString() === uriString) {
                     itemsToRemove.push(item.id);
@@ -110,10 +121,10 @@ export class ReqnrollTestDiscoveryController {
                     removeFromCollection(item.children);
                 }
             });
-            
+
             itemsToRemove.forEach(id => collection.delete(id));
         };
-        
+
         removeFromCollection(this.controller.items);
     }
 

@@ -8,6 +8,8 @@ export interface DiscoveredTest {
   label: string;
   uri: string;
   range: TestRange;
+  parentId?: string;
+  pickleIndex?: number;
   children?: DiscoveredTest[];
 }
 

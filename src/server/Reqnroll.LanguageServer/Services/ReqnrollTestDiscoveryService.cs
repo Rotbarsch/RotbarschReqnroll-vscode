@@ -74,7 +74,15 @@ public class ReqnrollTestDiscoveryService
                 Label = s.ScenarioName,
                 Range = FindScenarioRange(featureFileLines, s.ScenarioName),
                 Uri = request.Uri,
-
+                Children = s.Children.Select(c=>new DiscoveredTest
+                {
+                    Id = $"{hierarchy.Namespace}.{h.ClassName}.{s.MethodName}[{c.PickleIndex}]",
+                    Label = c.ScenarioName,
+                    Range = FindScenarioRange(featureFileLines, c.ScenarioName),
+                    Uri = request.Uri,
+                    ParentId= $"{hierarchy.Namespace}.{h.ClassName}.{s.MethodName}",
+                    PickleIndex = c.PickleIndex
+                }).ToList(),
             });
             scenarios.AddRange(simpleScenarios);
 
@@ -144,4 +152,5 @@ public class ReqnrollTestDiscoveryService
         // Return default if not found
         return new TestRange { StartLine = 0, EndLine = 0, StartCharacter = 0, EndCharacter = 0 };
     }
+
 }

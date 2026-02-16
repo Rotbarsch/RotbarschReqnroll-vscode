@@ -50,7 +50,26 @@ public class FeatureCsParserService(VsCodeOutputLogger logger)
                 var scenarioName = testFrameworkParser.GetScenarioName(method);
                 if (scenarioName is null) continue;
 
-                scenarioNodes.Add(new ScenarioNode() { MethodName = methodName, ScenarioName = scenarioName });
+                var scenarioNode = new ScenarioNode() { MethodName = methodName, ScenarioName = scenarioName };
+
+                if (testFrameworkParser.IsScenarioOutline(method))
+                {
+                    var exampleRows = testFrameworkParser.GetExampleRows(method);
+                    var exampleRowNodes = new List<ScenarioNode>();
+                    foreach (var exampleRow in exampleRows)
+                    {
+                        exampleRowNodes.Add(new ScenarioNode
+                        {
+                            MethodName = $"{methodName}[{exampleRow.PickleIndex}]",
+                            ScenarioName = $"{methodName}[{exampleRow.Arguments}]",
+                            PickleIndex = exampleRow.PickleIndex,
+                        });
+                    }
+
+                    scenarioNode.Children = exampleRowNodes;
+                }
+
+                scenarioNodes.Add(scenarioNode);
             }
 
             var featureNode = new FeatureNode { ClassName = className, FeatureName = featureName, ScenarioNodes = scenarioNodes };

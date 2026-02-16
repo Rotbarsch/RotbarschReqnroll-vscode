@@ -64,12 +64,12 @@ public class DotnetTestService
         }
     }
 
-    public async Task<IEnumerable<TestResult>> RunTestAsync(string csProjFilePath, string testQualifiedName)
+    public async Task<IEnumerable<TestResult>> RunTestAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex=null)
     {
         await _testLock.WaitAsync();
         try
         {
-            return await RunTestInternalAsync(csProjFilePath, testQualifiedName);
+            return await RunTestInternalAsync(csProjFilePath, testQualifiedName, pickleIndex);
         }
         finally
         {
@@ -77,10 +77,10 @@ public class DotnetTestService
         }
     }
 
-    private async Task<IEnumerable<TestResult>> RunTestInternalAsync(string csProjFilePath, string testQualifiedName)
+    private async Task<IEnumerable<TestResult>> RunTestInternalAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex=null)
     {
         var trxDir = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "rotbarsch.reqnroll", "test_results", SanitizeFolderName(testQualifiedName));
+            "rotbarsch.reqnroll", "test_results", SanitizeFolderName(testQualifiedName,pickleIndex));
         if (Directory.Exists(trxDir)) Directory.Delete(trxDir, true);
         Directory.CreateDirectory(trxDir);
         var trxFilePath = Path.Join(trxDir, "test_results.trx");
@@ -115,7 +115,7 @@ public class DotnetTestService
         processStartInfo.ArgumentList.Add("--no-restore");
         processStartInfo.ArgumentList.Add("--no-build");
         processStartInfo.ArgumentList.Add("--filter");
-        processStartInfo.ArgumentList.Add(GetDotNetTestFilterString(testQualifiedName));
+        processStartInfo.ArgumentList.Add(GetDotNetTestFilterString(testQualifiedName, pickleIndex));
         processStartInfo.ArgumentList.Add("-l:trx;LogFileName=" + trxFilePath);
 
         _logger.LogInfo("Running dotnet " + string.Join(" ", processStartInfo.ArgumentList));
@@ -218,15 +218,23 @@ public class DotnetTestService
         return result;
     }
 
-    private string GetDotNetTestFilterString(string testQualifiedName)
+    private string GetDotNetTestFilterString(string testQualifiedName, int? pickleIndex=null)
     {
+        if (pickleIndex.HasValue)
+        {
+            // This covers MSTest, NUnit and xUnit
+            return $"FullyQualifiedName={testQualifiedName}&(Name~{pickleIndex}|DisplayName~{pickleIndex})";
+        }
         return $"FullyQualifiedName={testQualifiedName}";
     }
 
-    private ReadOnlySpan<char> SanitizeFolderName(string input)
+    private ReadOnlySpan<char> SanitizeFolderName(string input, int? pickleIndex)
     {
+        var folderName = $"{input}";
+        if (pickleIndex.HasValue) folderName += $"_{pickleIndex}";
+
         string regexSearch = new string(Path.GetInvalidFileNameChars()) + new string(Path.GetInvalidPathChars());
         var r = new Regex($"[{Regex.Escape(regexSearch)}]");
-        return r.Replace(input, "");
+        return r.Replace(folderName, "");
     }
 }

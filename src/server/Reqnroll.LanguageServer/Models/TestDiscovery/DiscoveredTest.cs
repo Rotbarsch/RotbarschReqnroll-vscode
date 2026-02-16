@@ -18,4 +18,13 @@ public record DiscoveredTest
 
     [JsonProperty("children")]
     public List<DiscoveredTest>? Children { get; init; }
+
+    [JsonProperty("testFullName")]
+    public string? TestFullName { get; set; }
+
+    [JsonProperty("parentId")]
+    public string? ParentId { get; set; }
+
+    [JsonProperty("pickleIndex")]
+    public int? PickleIndex { get; set; }
 }

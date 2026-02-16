@@ -37,7 +37,7 @@ public class ReqnrollTestRunnerService
                 continue;
             }
 
-            result.AddRange(await _dotnetTestService.RunTestAsync(csProjPath, test.Id));
+            result.AddRange(await _dotnetTestService.RunTestAsync(csProjPath, test.ParentId ?? test.Id, test.PickleIndex));
         }
 
         return result;

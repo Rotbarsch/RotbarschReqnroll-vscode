@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Reqnroll.LanguageServer.Models.FeatureCsParser;
 
 namespace Reqnroll.LanguageServer.Services.GeneratedCsParser;
 
@@ -47,5 +48,34 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
         }
 
         return scenarioName;
+    }
+
+    public bool IsScenarioOutline(MethodDeclarationSyntax method)
+    {
+        return method.AttributeLists.SelectMany(x => x.Attributes).Select(x => x.Name.ToString())
+            .Any(x => x.Contains("DataRowAttribute"));
+    }
+
+    public IEnumerable<ExampleRow> GetExampleRows(MethodDeclarationSyntax method)
+    {
+        var result = new List<ExampleRow>();
+        var relevantAttributes = method.AttributeLists.SelectMany(x => x.Attributes).Where(x => x.ToString().Contains("DataRowAttribute"));
+
+        foreach (var a in relevantAttributes.Where(x => x.ArgumentList is not null))
+        {
+            var pickleIndex = (a.ArgumentList!.Arguments[^3].Expression as LiteralExpressionSyntax)?.Token.ValueText ?? "-1";
+            var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 2)
+                .Where(x => x.Expression is LiteralExpressionSyntax)
+                .Select(x => x.Expression as LiteralExpressionSyntax)
+                .Select(x => x?.Token.ValueText);
+
+            result.Add(new ExampleRow
+            {
+                Arguments = string.Join(",", arguments),
+                PickleIndex = int.Parse(pickleIndex)
+            });
+        }
+
+        return result;
     }
 }

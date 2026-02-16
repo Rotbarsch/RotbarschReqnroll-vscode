@@ -9,4 +9,10 @@ public class TestInfo
 
     [JsonProperty("filePath")]
     public string FilePath { get; set; } = string.Empty;
+
+    [JsonProperty("parentId")]
+    public string? ParentId { get; set; }
+
+    [JsonProperty("pickleIndex")]
+    public int? PickleIndex { get; set; }
 }

@@ -6,6 +6,8 @@ export interface RunTestsParams {
 export interface TestInfo {
   id: string;
   filePath: string;
+  parentId?: string;
+  pickleIndex?: number;
 }
 
 export interface TestResult {

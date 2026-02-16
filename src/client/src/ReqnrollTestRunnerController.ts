@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { TestResult, RunTestsParams, JsonRpcErrorLike } from './ReqnrollTestRunnerController.Models';
+import { TestResult, RunTestsParams, TestInfo, JsonRpcErrorLike } from './ReqnrollTestRunnerController.Models';
 
 
 export class ReqnrollTestRunnerController {
@@ -98,10 +98,26 @@ export class ReqnrollTestRunnerController {
   }
 
   private async sendRunTestsRequest(testItems: vscode.TestItem[]): Promise<TestResult[]> {
-    const tests = testItems.map(item => ({
-      id: item.id,
-      filePath: this.getFilePath(item)
-    }));
+    const tests = testItems.map(item => {
+      const testInfo: TestInfo = {
+        id: item.id,
+        filePath: this.getFilePath(item)
+      };
+
+      // Extract parentId from tags
+      const parentIdTag = item.tags.find(tag => tag.id.startsWith('parentId:'));
+      if (parentIdTag) {
+        testInfo.parentId = parentIdTag.id.substring('parentId:'.length);
+      }
+
+      // Extract pickleIndex from tags
+      const pickleIndexTag = item.tags.find(tag => tag.id.startsWith('pickleIndex:'));
+      if (pickleIndexTag) {
+        testInfo.pickleIndex = parseInt(pickleIndexTag.id.substring('pickleIndex:'.length));
+      }
+
+      return testInfo;
+    });
 
     return await this.client.sendRequest(
       'rotbarsch.reqnroll/runTests',
