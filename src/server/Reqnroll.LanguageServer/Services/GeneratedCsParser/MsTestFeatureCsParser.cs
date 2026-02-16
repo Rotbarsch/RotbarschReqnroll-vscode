@@ -64,7 +64,7 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
         foreach (var a in relevantAttributes.Where(x => x.ArgumentList is not null))
         {
             var pickleIndex = (a.ArgumentList!.Arguments[^3].Expression as LiteralExpressionSyntax)?.Token.ValueText ?? "-1";
-            var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 2)
+            var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 3)
                 .Where(x => x.Expression is LiteralExpressionSyntax)
                 .Select(x => x.Expression as LiteralExpressionSyntax)
                 .Select(x => x?.Token.ValueText);
