@@ -36,14 +36,39 @@
     "configuration": {
       "title": "Reqnroll",
       "properties": {
-        "reqnroll.test.parallelExecutionLimit": {
+        "rotbarsch.reqnroll.test.parallelExecutionLimit": {
           "type": "number",
           "default": 5,
           "minimum": 1,
-          "maximum": 20,
           "description": "Maximum number of tests that can run in parallel. Default is 5."
         }
       }
+    },
+    "commands": [
+      {
+        "command": "rotbarsch.reqnroll.forceRebuildProject",
+        "title": "Reqnroll: Force rebuild project",
+        "category": "Reqnroll"
+      },
+      {
+        "command": "rotbarsch.reqnroll.rerunTestDiscovery",
+        "title": "Reqnroll: Re-run test discovery",
+        "category": "Reqnroll"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "rotbarsch.reqnroll.forceRebuildProject",
+          "when": "resourceExtname == .feature",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rotbarsch.reqnroll.rerunTestDiscovery",
+          "when": "resourceExtname == .feature",
+          "group": "navigation@3"
+        }
+      ]
     }
   },
   "scripts": {

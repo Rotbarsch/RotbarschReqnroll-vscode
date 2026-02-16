@@ -3,8 +3,8 @@ A VS Code extension specifically tailored to Reqnroll.
 Only Windows for now - sorry.
 
 # Getting started
-1. I recommend installing [C# Dev Kit Extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit) for easy test running, if not already installed in your Visual Studio Code.
-2. Install the Rotbarsch.Reqnroll Visual Studio Code extension
+1. Make sure the [dotnet CLI](https://dotnet.microsoft.com/en-us/download) matching your test projects is installed.
+2. Install the [Rotbarsch.Reqnroll Visual Studio Code extension](https://marketplace.visualstudio.com/items?itemName=Rotbarsch.rotbarsch-reqnroll-vscode).
 3. For best results, set the following in your VS Code settings.json:
 ```
 "[reqnroll-feature]": {
@@ -51,7 +51,11 @@ Only Windows for now - sorry.
 - Extracts parameter information and documentation from XML comments
 
 ## Test Execution
-- Run feature tests directly from the editor with CodeLens actions (requires [C# Dev Kit Extension](https://marketplace.visualstudio.com/items?itemName=ms-dotnettools.csdevkit))
+- Run features, scenarios and scenario outlines through the Visual Studio Code Test Explorer
+- Supports [Reqnroll.MsTest](https://docs.reqnroll.net/latest/integrations/mstest.html)
+- Supports [Reqnroll.xUnit](https://docs.reqnroll.net/latest/integrations/xunit.html)
+- Supports [Reqnroll.xUnit.v3](https://docs.reqnroll.net/latest/integrations/xunit.html)
+- Supports [Reqnroll.NUnit](https://docs.reqnroll.net/latest/integrations/nunit.html) 
 
 # Debugging
 Open this workspace in VS Code and (my recommendation) the .sln file in Visual Studio. When pressing F5 (using the "Run VS Code Extension") in VS Code, it builds the TypeScript client and C# Language Server Protocol Server in Debug mode. 

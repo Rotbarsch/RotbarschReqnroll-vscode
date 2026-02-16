@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Protocol.General;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using Reqnroll.LanguageServer.Handlers;
 using Reqnroll.LanguageServer.Models.DotnetBuild;
@@ -66,6 +67,11 @@ var server = await LanguageServer.From(options =>
             var buildRequestHandler = serviceProvider?.GetService<DotnetBuildRequestHandler>()!;
             return buildRequestHandler.HandleStartBuildRequestAsync(request, ct);
         })
+        .OnRequest<StartBuildParams, BuildResult>("rotbarsch.reqnroll/forceBuild", (request, ct) =>
+        {
+            var buildRequestHandler = serviceProvider?.GetService<DotnetBuildRequestHandler>()!;
+            return buildRequestHandler.HandleForceBuildRequestAsync(request, ct);
+        })
         .OnInitialize((server, request, token) =>
         {
             serviceProvider = server.Services;
@@ -97,8 +103,12 @@ var server = await LanguageServer.From(options =>
 
             try
             {
-                var parallelLimit = languageServer.Configuration.GetValue<int>("reqnroll:test:parallelExecutionLimit");
-                testService.SetParallelExecutionLimit(parallelLimit);
+                var parallelLimitConfig = await languageServer.Configuration.GetConfiguration(new ConfigurationItem
+                {
+                    Section="rotbarsch"
+                });
+                var limit = parallelLimitConfig.GetValue<int>("rotbarsch:reqnroll:test:parallelExecutionLimit");
+                testService.SetParallelExecutionLimit(limit);
             }
             catch (Exception ex)
             {

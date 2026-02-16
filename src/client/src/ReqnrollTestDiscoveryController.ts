@@ -49,7 +49,7 @@ export class ReqnrollTestDiscoveryController {
         return watcher;
     }
 
-    private async discoverTestsForFile(uri: vscode.Uri): Promise<void> {
+    public async discoverTestsForFile(uri: vscode.Uri): Promise<void> {
         try {
             const tests = await this.sendDiscoverTestsRequest(uri.toString());
 
@@ -106,7 +106,7 @@ export class ReqnrollTestDiscoveryController {
         ) as DiscoveredTest[];
     }
 
-    private removeTestItemsForFile(uri: vscode.Uri): void {
+    public removeTestItemsForFile(uri: vscode.Uri): void {
         const uriString = uri.toString();
 
         // Remove all test items that belong to this file
