@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.Threading;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using Reqnroll.LanguageServer.Models.DotnetBuild;
 
 namespace Reqnroll.LanguageServer.Services;
@@ -7,7 +7,6 @@ namespace Reqnroll.LanguageServer.Services;
 public class DotnetBuildService
 {
     private readonly VsCodeOutputLogger _logger;
-    private readonly Dictionary<string, Process> _activeBuilds = new();
     private readonly SemaphoreSlim _buildLock = new(1, 1);
 
     public DotnetBuildService(VsCodeOutputLogger logger)
@@ -15,7 +14,7 @@ public class DotnetBuildService
         _logger = logger;
     }
 
-    public async Task<BuildResult> BuildCsProject(string projectFile, bool forceBuild=false, CancellationToken cancellationToken=default)
+    public async Task<BuildResult> BuildCsProject(string projectFile, bool forceFullRebuild = false, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectFile))
         {
@@ -28,13 +27,27 @@ public class DotnetBuildService
             };
         }
 
+        // If projectFile is a .csproj, skip project identification
+        string buildTarget = projectFile;
+        if (!projectFile.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+        {
+            // TODO: Identify corresponding csproj for feature file
+            // buildTarget = FindCsprojForFeatureFile(projectFile);
+        }
+
         await _buildLock.WaitAsync(cancellationToken);
         try
         {
+            string buildArgs = " --no-restore";
+            if (forceFullRebuild)
+            {
+                buildArgs = " --no-incremental";
+            }
+
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"build \"{projectFile}\"",
+                Arguments = $"build \"{projectFile}\"{buildArgs}",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -63,14 +76,11 @@ public class DotnetBuildService
             process.Exited += (sender, args) =>
             {
                 _logger.LogInfo($"[dotnet build] Process exited");
-                _activeBuilds.Remove(projectFile);
             };
 
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-
-            _activeBuilds[projectFile] = process;
 
             var message = $"Started dotnet build for project: {projectFile}";
             _logger.LogInfo(message);
@@ -88,6 +98,7 @@ public class DotnetBuildService
         {
             var message = $"Failed to execute dotnet build: {ex.Message}";
             _logger.LogError(message);
+            
             return new BuildResult
             {
                 Success = false,

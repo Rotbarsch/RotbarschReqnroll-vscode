@@ -48,20 +48,24 @@
           "begin": "\"\"\"",
           "end": "\"\"\"",
           "patterns": [
-            {
-              "include": "#parameters"
-            }
+            { "include": "#parameters" }
           ]
         },
         {
           "name": "string.quoted.double.reqnroll",
           "begin": "\"",
-          "end": "\""
+          "end": "\"",
+          "patterns": [
+            { "include": "#parameters" }
+          ]
         },
         {
           "name": "string.quoted.single.reqnroll",
           "begin": "'",
-          "end": "'"
+          "end": "'",
+          "patterns": [
+            { "include": "#parameters" }
+          ]
         }
       ]
     },

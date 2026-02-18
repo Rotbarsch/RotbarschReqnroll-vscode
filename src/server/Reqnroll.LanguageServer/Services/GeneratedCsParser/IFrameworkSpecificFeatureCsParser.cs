@@ -1,4 +1,3 @@
-using System.Collections;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Reqnroll.LanguageServer.Models.FeatureCsParser;
 

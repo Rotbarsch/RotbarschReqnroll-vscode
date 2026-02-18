@@ -1,6 +1,7 @@
 
 export interface StartBuildParams {
   featureFileUri: string;
+  fullRebuild:boolean;
 }
 
 export interface BuildResult {

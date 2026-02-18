@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { TestResult, RunTestsParams, TestInfo, JsonRpcErrorLike } from './ReqnrollTestRunnerController.Models';
+import { TestResult, RunTestsParams, TestInfo, JsonRpcErrorLike } from '../Models/ReqnrollTestRunnerController.Models';
 
 
 export class ReqnrollTestRunnerController {
