@@ -7,7 +7,7 @@ import {
   ServerOptions,
   TransportKind
 } from 'vscode-languageclient/node';
-import { DotnetBuildController } from './DotnetBuildController';
+import { DotnetBuildController } from './Controllers/DotnetBuildController';
 import { ReqnrollTestDiscoveryController } from './Controllers/ReqnrollTestDiscoveryController';
 import { ReqnrollTestRunnerController } from './Controllers/ReqnrollTestRunnerController';
 import { DotnetVersionChecker } from './DotnetVersionChecker';

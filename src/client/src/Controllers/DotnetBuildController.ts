@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { StartBuildParams, BuildResult } from './Models/DotnetBuild.Models';
+import { StartBuildParams, BuildResult } from '../Models/DotnetBuild.Models';
 
 
 export class DotnetBuildController {
@@ -14,25 +14,28 @@ export class DotnetBuildController {
     public setupBuildTriggers(): void {
         vscode.workspace.onDidSaveTextDocument(async (document) => {
             const fileName = document.fileName;
-            if ((fileName.endsWith('.feature') || fileName.endsWith('.feature.cs')) && !document.isDirty) {
-                // Wait 1 second before sending build request
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            if (document.isDirty) return;
+
+            if ((fileName.endsWith('.feature') || fileName.endsWith('.feature.cs'))) {
                 try {
-                    await this.sendBuildRequest(document.uri.toString());
-                    // Run test discovery after build completes
-                    if (this.discoveryController && typeof this.discoveryController.discoverTestsForFile === 'function') {
-                        await this.discoveryController.discoverTestsForFile(document.uri);
-                    }
+                    await this.buildAndDiscover(document);
                 } catch (error) {
-                    vscode.window.showErrorMessage(this.formatRequestError(error));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await this.buildAndDiscover(document);
                 }
             }
         });
     }
 
-    /**
-     * Optionally set the discovery controller to enable test discovery after build.
-     */
+    private async buildAndDiscover(document: vscode.TextDocument) {
+        await this.sendBuildRequest(document.uri.toString());
+        // Run test discovery after build completes
+        if (this.discoveryController) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await this.discoveryController.discoverTestsForFile(document.uri);
+        }
+    }
+
     public setDiscoveryController(controller: any) {
         this.discoveryController = controller;
     }
