@@ -2,7 +2,7 @@
   "name": "rotbarsch-reqnroll-vscode",
   "displayName": "Rotbarsch.Reqnroll",
   "description": "Reqnroll support for VS Code",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "Rotbarsch",
   "license": "MIT",
   "icon": "images/icon.png",
