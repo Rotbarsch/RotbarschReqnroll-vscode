@@ -7,9 +7,9 @@ import {
   ServerOptions,
   TransportKind
 } from 'vscode-languageclient/node';
-import { ReqnrollTestDiscoveryController } from './ReqnrollTestDiscoveryController';
-import { ReqnrollTestRunnerController } from './ReqnrollTestRunnerController';
 import { DotnetBuildController } from './DotnetBuildController';
+import { ReqnrollTestDiscoveryController } from './Controllers/ReqnrollTestDiscoveryController';
+import { ReqnrollTestRunnerController } from './Controllers/ReqnrollTestRunnerController';
 import { DotnetVersionChecker } from './DotnetVersionChecker';
 
 let client: LanguageClient;
@@ -91,17 +91,23 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const runnerController = new ReqnrollTestRunnerController(client);
   const runProfile = runnerController.activate(discoveryControllerInstance);
 
-  // Setup dotnet build manager
+  context.subscriptions.push(discoveryControllerInstance, discoveryWatcher, runProfile);
+
+  // Setup DotnetBuildController file watcher for feature file saves
   const buildController = new DotnetBuildController(client);
-  const buildWatcher = buildController.setupBuildTriggers();
+  buildController.setDiscoveryController(discoveryController);
+  buildController.setupBuildTriggers();
 
-  context.subscriptions.push(discoveryControllerInstance, discoveryWatcher, runProfile, buildWatcher);
-
-  // Register context menu command for feature files
+  // Register rebuild command for feature files
   context.subscriptions.push(
     vscode.commands.registerCommand('rotbarsch.reqnroll.forceRebuildProject', async (uri: vscode.Uri) => {
-      if (!uri || uri.scheme !== 'file' || !uri.fsPath.endsWith('.feature')) {
-        vscode.window.showErrorMessage('This command can only be used on .feature files.');
+      if (!uri || uri.scheme !== 'file') {
+        vscode.window.showErrorMessage('This command can only be used on files.');
+        return;
+      }
+      const filePath = uri.fsPath;
+      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
         return;
       }
       try {
@@ -113,14 +119,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     })
   );
 
-  // Register re-run test discovery command for feature files
+  // Register full rebuild command for feature files
   context.subscriptions.push(
-    vscode.commands.registerCommand('rotbarsch.reqnroll.rerunTestDiscovery', async (uri: vscode.Uri) => {
-      if (!uri || uri.scheme !== 'file' || !uri.fsPath.endsWith('.feature')) {
-        vscode.window.showErrorMessage('This command can only be used on .feature files.');
+    vscode.commands.registerCommand('rotbarsch.reqnroll.forceRebuildProjectFull', async (uri: vscode.Uri) => {
+      if (!uri || uri.scheme !== 'file') {
+        vscode.window.showErrorMessage('This command can only be used on files.');
+        return;
+      }
+      const filePath = uri.fsPath;
+      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
         return;
       }
       try {
+        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { featureFileUri: uri.toString(), fullRebuild: true });
+        vscode.window.showInformationMessage('Reqnroll: Project rebuild triggered.');
+      } catch (err) {
+        vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
+      }
+    })
+  );
+
+  // Register re-run test discovery command for feature files
+  context.subscriptions.push(
+    vscode.commands.registerCommand('rotbarsch.reqnroll.rerunTestDiscovery', async (uri: vscode.Uri) => {
+      if (!uri || uri.scheme !== 'file') {
+        vscode.window.showErrorMessage('This command can only be used on files.');
+        return;
+      }
+      const filePath = uri.fsPath;
+      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
+        return;
+      }
+      try {
+        if (filePath.endsWith('.csproj')) {
+          vscode.window.showInformationMessage('Reqnroll: Test discovery is not applicable for .csproj files.');
+          return;
+        }
         discoveryController.removeTestItemsForFile(uri);
         await discoveryController.discoverTestsForFile(uri);
         vscode.window.showInformationMessage('Reqnroll: Test discovery re-run for this file.');

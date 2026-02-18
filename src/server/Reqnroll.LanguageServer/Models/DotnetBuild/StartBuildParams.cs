@@ -6,4 +6,7 @@ public class StartBuildParams
 {
     [JsonProperty("featureFileUri")]
     public string FeatureFileUri { get; set; } = string.Empty;
+
+    [JsonProperty("fullRebuild")]
+    public bool FullRebuild { get; set; } = false;
 }

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { DiscoveredTest, DiscoverTestsParams } from './ReqnrollTestDiscoveryController.Models';
+import { DiscoveredTest, DiscoverTestsParams } from '../Models/ReqnrollTestDiscoveryController.Models';
 
 
 export class ReqnrollTestDiscoveryController {

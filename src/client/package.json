@@ -47,14 +47,19 @@
     "commands": [
       {
         "command": "rotbarsch.reqnroll.forceRebuildProject",
-        "title": "Reqnroll: Force rebuild project",
+        "title": "Reqnroll: Rebuild project",
+        "category": "Reqnroll"
+      },
+      {
+        "command": "rotbarsch.reqnroll.forceRebuildProjectFull",
+        "title":"Reqnroll: Rebuild project (full)",
         "category": "Reqnroll"
       },
       {
         "command": "rotbarsch.reqnroll.rerunTestDiscovery",
         "title": "Reqnroll: Re-run test discovery",
         "category": "Reqnroll"
-      }
+      }      
     ],
     "menus": {
       "editor/context": [
@@ -64,8 +69,30 @@
           "group": "navigation@2"
         },
         {
+          "command": "rotbarsch.reqnroll.forceRebuildProjectFull",
+          "when": "resourceExtname == .feature",
+          "group": "navigation@2"
+        },
+        {
           "command": "rotbarsch.reqnroll.rerunTestDiscovery",
           "when": "resourceExtname == .feature",
+          "group": "navigation@3"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "rotbarsch.reqnroll.forceRebuildProject",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rotbarsch.reqnroll.forceRebuildProjectFull",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
+          "group": "navigation@2"
+        },
+        {
+          "command": "rotbarsch.reqnroll.rerunTestDiscovery",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
           "group": "navigation@3"
         }
       ]

@@ -1,4 +1,6 @@
-﻿using Reqnroll.LanguageServer.Helpers;
+﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using Reqnroll.LanguageServer.Helpers;
 using Reqnroll.LanguageServer.Models.TestRunner;
 using System.Diagnostics;
 using System.Text;
@@ -176,6 +178,7 @@ public class DotnetTestService
         if (testResults is null || (testResults.Count == 0 && process.ExitCode != 0))
         {
             _logger.LogError($"[dotnet test] Process failed with exit code {process.ExitCode}");
+            
             return [new TestResult
             {
                 Id = testQualifiedName,

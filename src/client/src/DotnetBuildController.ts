@@ -1,52 +1,57 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { StartBuildParams, BuildResult } from './DotnetWatch.Models';
+import { StartBuildParams, BuildResult } from './Models/DotnetBuild.Models';
 
 
 export class DotnetBuildController {
+    private discoveryController?: any;
+    private isBuilding = false;
+
     public constructor(
         private readonly client: LanguageClient
-    ) {
-    }
+    ) { }
 
-    public setupBuildTriggers(): vscode.FileSystemWatcher {
-        // Watch for .feature file changes to trigger builds
-        const watcher = vscode.workspace.createFileSystemWatcher('**/*.feature');
-
-        watcher.onDidCreate(async (uri) => {
-            await this.triggerBuild(uri);
-        });
-
-        watcher.onDidChange(async (uri) => {
-            await this.triggerBuild(uri);
-        });
-
-        // Trigger builds for all existing feature files
-        vscode.workspace.findFiles('**/*.feature').then(async (uris) => {
-            for (const uri of uris) {
-                await this.triggerBuild(uri);
+    public setupBuildTriggers(): void {
+        vscode.workspace.onDidSaveTextDocument(async (document) => {
+            const fileName = document.fileName;
+            if ((fileName.endsWith('.feature') || fileName.endsWith('.feature.cs')) && !document.isDirty) {
+                // Wait 1 second before sending build request
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                try {
+                    await this.sendBuildRequest(document.uri.toString());
+                    // Run test discovery after build completes
+                    if (this.discoveryController && typeof this.discoveryController.discoverTestsForFile === 'function') {
+                        await this.discoveryController.discoverTestsForFile(document.uri);
+                    }
+                } catch (error) {
+                    vscode.window.showErrorMessage(this.formatRequestError(error));
+                }
             }
         });
-
-        return watcher;
     }
 
-    private async triggerBuild(uri: vscode.Uri): Promise<void> {
-        try {
-            const result = await this.sendBuildRequest(uri.toString());
-            if (!result.success) {
-                console.warn(`Build failed: ${result.message}`);
-            }
-        } catch (error) {
-            console.error(`Build failed for ${uri.toString()}: ${this.formatRequestError(error)}`);
-        }
+    /**
+     * Optionally set the discovery controller to enable test discovery after build.
+     */
+    public setDiscoveryController(controller: any) {
+        this.discoveryController = controller;
     }
 
     private async sendBuildRequest(featureFileUri: string): Promise<BuildResult> {
-        return await this.client.sendRequest(
-            'rotbarsch.reqnroll/startBuild',
-            { featureFileUri } as StartBuildParams
-        ) as BuildResult;
+        // Ensure only one build request is active at a time
+        if (this.isBuilding) {
+            return Promise.reject('Build request already in progress.');
+        }
+        this.isBuilding = true;
+        try {
+            const result = await this.client.sendRequest(
+                'rotbarsch.reqnroll/startBuild',
+                { featureFileUri } as StartBuildParams
+            ) as BuildResult;
+            return result;
+        } finally {
+            this.isBuilding = false;
+        }
     }
 
     private formatRequestError(error: unknown): string {
