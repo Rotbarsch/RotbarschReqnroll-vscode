@@ -10,10 +10,16 @@ namespace Reqnroll.LanguageServer.Services;
 /// </summary>
 public class ReqnrollBindingStorageService
 {
+    private readonly VsCodeOutputLogger _logger;
     private string? _workspaceDirectory;
     private List<BindingMetadata> _bindingInfos = new List<BindingMetadata>();
     private DateTime _lastLoadTime = DateTime.MinValue;
-    
+
+    public ReqnrollBindingStorageService(VsCodeOutputLogger logger)
+    {
+        _logger = logger;
+    }
+
     /// <summary>
     /// Sets the workspace directory and loads bindings from it.
     /// </summary>
@@ -27,8 +33,16 @@ public class ReqnrollBindingStorageService
     {
         if (!string.IsNullOrEmpty(_workspaceDirectory))
         {
-            _bindingInfos = BindingMetadataManager.GetAll(_workspaceDirectory);
-            _lastLoadTime = DateTime.UtcNow;
+            try
+            {
+                _bindingInfos = BindingMetadataManager.GetAll(_workspaceDirectory);
+                _lastLoadTime = DateTime.UtcNow;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+            }
+            
         }
     }
     

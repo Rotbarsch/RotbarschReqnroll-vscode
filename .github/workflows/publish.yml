@@ -27,7 +27,7 @@ jobs:
           dotnet-version: "8.0.x"
 
       - name: Build C# language server
-        run: dotnet publish src/server/Reqnroll.LanguageServer/Reqnroll.LanguageServer.csproj -c Release -r win-x64 --self-contained true
+        run: dotnet publish src/server/Reqnroll.LanguageServer/Reqnroll.LanguageServer.csproj -c Release -p:SelfContained=false -p:PublishSingleFile=true -o ./src/client/artifacts/lsp
 
       # Build Client
       - name: Setup Node

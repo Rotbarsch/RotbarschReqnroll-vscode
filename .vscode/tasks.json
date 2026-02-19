@@ -21,10 +21,10 @@
         "src/server/Reqnroll.LanguageServer/Reqnroll.LanguageServer.csproj",
         "-c",
         "Debug",
-        "-r",
-        "win-x64",
-        "--self-contained",
-        "true"
+        "-p:SelfContained=false",
+        "-p:PublishSingleFile=true",
+        "-o",
+        "./src/client/artifacts/lsp"
       ],
       "dependsOn": ["compile-client"],
       "problemMatcher": "$msCompile",

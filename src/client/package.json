@@ -2,7 +2,7 @@
   "name": "rotbarsch-reqnroll-vscode",
   "displayName": "Rotbarsch.Reqnroll",
   "description": "Reqnroll support for VS Code",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "Rotbarsch",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -15,7 +15,8 @@
   },
   "os": ["win32"],
   "activationEvents": [
-    "onLanguage:reqnroll-feature"
+    "onLanguage:reqnroll-feature",
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
