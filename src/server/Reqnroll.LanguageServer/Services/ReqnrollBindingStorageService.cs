@@ -14,6 +14,7 @@ public class ReqnrollBindingStorageService
     private string? _workspaceDirectory;
     private List<BindingMetadata> _bindingInfos = new List<BindingMetadata>();
     private DateTime _lastLoadTime = DateTime.MinValue;
+    private readonly List<string> _trackedWorkspaces = new List<string>();
 
     public ReqnrollBindingStorageService(VsCodeOutputLogger logger)
     {
@@ -28,24 +29,34 @@ public class ReqnrollBindingStorageService
         _workspaceDirectory = directory;
         RefreshBindings();
     }
-    
-    private void RefreshBindings()
+
+    /// <summary>
+    /// Identifies
+    /// </summary>
+    public async Task ForceRefresh()
     {
-        if (!string.IsNullOrEmpty(_workspaceDirectory))
+        _trackedWorkspaces.Clear();
+        await RefreshBindings();
+    }
+
+    private Task RefreshBindings()
+    {
+        if (!string.IsNullOrEmpty(_workspaceDirectory) && !_trackedWorkspaces.Contains(_workspaceDirectory))
         {
-            try
+            _trackedWorkspaces.Add(_workspaceDirectory);
+
+            return Task.Run(() =>
             {
+                _bindingInfos.Clear();
                 _bindingInfos = BindingMetadataManager.GetAll(_workspaceDirectory);
                 _lastLoadTime = DateTime.UtcNow;
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-            }
-            
+                _logger.LogInfo($"Loaded {_bindingInfos.Count} bindings from workspace {_workspaceDirectory}");
+            });          
         }
+
+        return Task.CompletedTask;
     }
-    
+
     /// <summary>
     /// Checks if any binding matches the given step text using regex pattern matching.
     /// </summary>

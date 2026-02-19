@@ -59,11 +59,11 @@ Only Windows for now - sorry.
 
 # Debugging
 Open this workspace in VS Code and (my recommendation) the .sln file in Visual Studio. When pressing F5 (using the "Run VS Code Extension") in VS Code, it builds the TypeScript client and C# Language Server Protocol Server in Debug mode. 
-When the server is started in DEBUG configuration, you've got 10 seconds to attach a debugger (that's what the Visual Studio instance is for).
+When the server is started in DEBUG configuration, it will try to launch a debugger.
 
 # Building as VSIX
 1. In client (`src/client`) folder: `npm run compile`
-2. In server (`src/server/Reqnroll.LanguageServer`) folder: `dotnet publish -c Release -r win-x64 --self-contained true`
+2. In server (`src/server/Reqnroll.LanguageServer`) folder: `dotnet publish -c Release`
 3. Make sure the `src/client/artifacts/lsp` folder is filled with the build output. This should work through the way the csproj is set up.
 4. Install the Visual Studio code extension packager via `npm install -g @vscode/vsce` (only once, of course)
 5. Package the project, so execute in `src/client` the following: `vsce package`

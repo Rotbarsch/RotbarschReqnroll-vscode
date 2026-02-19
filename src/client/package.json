@@ -60,7 +60,12 @@
         "command": "rotbarsch.reqnroll.rerunTestDiscovery",
         "title": "Reqnroll: Re-run test discovery",
         "category": "Reqnroll"
-      }      
+      },
+      {
+        "command": "rotbarsch.reqnroll.refreshBindings",
+        "title": "Reqnroll: Refresh bindings",
+        "category": "Reqnroll"
+      }
     ],
     "menus": {
       "editor/context": [
@@ -77,7 +82,12 @@
         {
           "command": "rotbarsch.reqnroll.rerunTestDiscovery",
           "when": "resourceExtname == .feature",
-          "group": "navigation@3"
+          "group": "navigation@2"
+        },
+        {
+          "command": "rotbarsch.reqnroll.refreshBindings",
+          "when": "resourceExtname == .feature",
+          "group": "navigation@2"
         }
       ],
       "explorer/context": [

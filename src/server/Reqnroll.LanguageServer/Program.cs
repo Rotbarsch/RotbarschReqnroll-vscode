@@ -15,12 +15,7 @@ using Reqnroll.LanguageServer.Models.TestRunner;
 if (args.Contains("--wait-for-debugger"))
 {
     Console.Error.WriteLine("Waiting for debugger (a maximum of 10 seconds)...");
-    int counter = 0;
-    while (!Debugger.IsAttached && counter <= 10)
-    {
-        Thread.Sleep(1000);
-        counter++;
-    }
+    Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
 #endif
@@ -71,6 +66,11 @@ var server = await LanguageServer.From(options =>
         {
             var buildRequestHandler = serviceProvider?.GetService<DotnetBuildRequestHandler>()!;
             return buildRequestHandler.HandleForceBuildRequestAsync(request, ct);
+        })
+        .OnRequest<ForceRefreshBindingsParams>("rotbarsch.reqnroll/refreshBindings", async (request, ct) =>
+        {
+            var bindingStorageService = serviceProvider?.GetService<ReqnrollBindingStorageService>()!;
+            await bindingStorageService.ForceRefresh();
         })
         .OnInitialize((languageServer, request, token) =>
         {
