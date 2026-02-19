@@ -72,40 +72,48 @@ var server = await LanguageServer.From(options =>
             var buildRequestHandler = serviceProvider?.GetService<DotnetBuildRequestHandler>()!;
             return buildRequestHandler.HandleForceBuildRequestAsync(request, ct);
         })
-        .OnInitialize((server, request, token) =>
+        .OnInitialize((languageServer, request, token) =>
         {
-            serviceProvider = server.Services;
+            languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP initializing..");
 
-            var bindingStorageService = server.Services.GetService<ReqnrollBindingStorageService>()!;
-
-            server.Window.LogInfo("Rotbarsch.Reqnroll LSP initialized");
-
-            // Store workspace directory
-            if (request.RootUri is not null)
+            try
             {
-                var workspacePath = request.RootUri.GetFileSystemPath();
-                bindingStorageService.SetWorkspaceDirectory(workspacePath);
-                server.Window.LogInfo($"Workspace directory: {workspacePath}");
-            }
-            else if (request.RootPath != null)
-            {
-                bindingStorageService.SetWorkspaceDirectory(request.RootPath);
-                server.Window.LogInfo($"Workspace directory: {request.RootPath}");
-            }
+                serviceProvider = languageServer.Services;
 
+                var bindingStorageService = languageServer.Services.GetService<ReqnrollBindingStorageService>()!;
+
+                // Store workspace directory
+                if (request.RootUri is not null)
+                {
+                    var workspacePath = request.RootUri.GetFileSystemPath();
+                    bindingStorageService.SetWorkspaceDirectory(workspacePath);
+                    languageServer.Window.LogInfo($"Workspace directory: {workspacePath}");
+                }
+                else if (request.RootPath != null)
+                {
+                    bindingStorageService.SetWorkspaceDirectory(request.RootPath);
+                    languageServer.Window.LogInfo($"Workspace directory: {request.RootPath}");
+                }
+
+                languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP initialized");
+
+            }
+            catch (Exception e)
+            {
+                languageServer.Window.LogError(e.Message);
+            }
             return Task.CompletedTask;
         })
         .OnStarted(async (languageServer, token) =>
         {
-            languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP started");
-
-            var testService = serviceProvider?.GetService<DotnetTestService>()!;
+            languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP starting...");
 
             try
             {
+                var testService = serviceProvider?.GetService<DotnetTestService>()!;
                 var parallelLimitConfig = await languageServer.Configuration.GetConfiguration(new ConfigurationItem
                 {
-                    Section="rotbarsch"
+                    Section = "rotbarsch"
                 });
                 var limit = parallelLimitConfig.GetValue<int>("rotbarsch:reqnroll:test:parallelExecutionLimit");
                 testService.SetParallelExecutionLimit(limit);
@@ -115,6 +123,7 @@ var server = await LanguageServer.From(options =>
                 languageServer.Window.LogWarning($"Failed to read parallel execution limit configuration: {ex.Message}");
             }
 
+            languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP started.");
         })
         .OnExit(_ =>
         {
