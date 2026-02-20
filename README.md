@@ -46,7 +46,7 @@ Only Windows for now - sorry.
 
 ## Binding Integration
 - Loads step bindings from your project assemblies
-- Caches binding metadata with automatic refresh (30-second intervals)
+- Caches binding metadata with automatic refresh
 - Supports both regex and Cucumber expression patterns
 - Extracts parameter information and documentation from XML comments
 
