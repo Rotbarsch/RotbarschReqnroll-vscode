@@ -69,3 +69,10 @@ When the server is started in DEBUG configuration, it will try to launch a debug
 5. Package the project, so execute in `src/client` the following: `vsce package`
 6. Install the created vsix file: `code --install-extension .\rotbarsch-reqnroll-vscode-0.0.1.vsix`
 7. If syntax highlighting and auto complete works, you're all set up! Check the "Reqnroll Language Server" in the output of your VS Code instance to check for errors.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
+
+### Third-Party Dependencies
+Information about the licenses of dependencies can be found in the [THIRD-PARTY_NOTICES.txt](./THIRD-PARTY_NOTICES.txt) file.

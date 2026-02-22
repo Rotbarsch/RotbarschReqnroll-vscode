@@ -1,0 +1,29 @@
+THIRD-PARTY SOFTWARE NOTICES AND INFORMATION
+=============================================================
+
+This project depends on the following third-party software:
+
+=============================================================
+Microsoft.CodeAnalysis.CSharp
+Copyright © Microsoft
+
+Licensed under the MIT License.
+https://github.com/dotnet/roslyn/blob/main/LICENSE
+
+=============================================================
+OmniSharp.Extensions.LanguageServer
+Copyright © OmniSharp contributors
+
+Licensed under the MIT License.
+https://github.com/OmniSharp/csharp-language-server-protocol/blob/main/LICENSE
+
+=============================================================
+Rotbarsch.ReqnrollBindingMetadataExtractor
+Copyright © Rotbarsch contributors
+
+Licensed under the MIT License.
+https://github.com/Rotbarsch/Rotbarsch.ReqnrollBindingMetadataExtractor/blob/main/LICENSE
+
+=============================================================
+
+
