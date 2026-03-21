@@ -419,3 +419,6 @@ FodyWeavers.xsd
 
 # Ignore generated code files from Reqnroll
 *.feature.cs
+/Demo/Example.MsTest/Features/FirstFeature.feature.cs
+/Demo/Example.XUnit3/Features/FirstFeature.feature.cs
+/Demo/Example.NUnit/Features/FirstFeature.feature.cs
