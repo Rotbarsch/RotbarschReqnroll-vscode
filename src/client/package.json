@@ -93,17 +93,17 @@
       "explorer/context": [
         {
           "command": "rotbarsch.reqnroll.forceRebuildProject",
-          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj || resourceExtname == .sln || resourceExtname == .slnx || explorerResourceIsFolder",
           "group": "navigation@2"
         },
         {
           "command": "rotbarsch.reqnroll.forceRebuildProjectFull",
-          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj || resourceExtname == .sln || resourceExtname == .slnx || explorerResourceIsFolder",
           "group": "navigation@2"
         },
         {
           "command": "rotbarsch.reqnroll.rerunTestDiscovery",
-          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj",
+          "when": "resourceExtname == .feature || resourceExtname == .feature.cs || resourceExtname == .csproj || resourceExtname == .sln || resourceExtname == .slnx || explorerResourceIsFolder",
           "group": "navigation@3"
         }
       ]

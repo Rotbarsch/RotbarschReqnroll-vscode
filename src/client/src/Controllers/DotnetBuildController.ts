@@ -40,7 +40,7 @@ export class DotnetBuildController {
         this.discoveryController = controller;
     }
 
-    private async sendBuildRequest(featureFileUri: string): Promise<BuildResult> {
+    private async sendBuildRequest(referenceFileUri: string): Promise<BuildResult> {
         // Ensure only one build request is active at a time
         if (this.isBuilding) {
             return Promise.reject('Build request already in progress.');
@@ -49,7 +49,7 @@ export class DotnetBuildController {
         try {
             const result = await this.client.sendRequest(
                 'rotbarsch.reqnroll/startBuild',
-                { featureFileUri } as StartBuildParams
+                { referenceFileUri: referenceFileUri } as StartBuildParams
             ) as BuildResult;
             return result;
         } finally {

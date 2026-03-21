@@ -14,7 +14,7 @@ public class DotnetBuildService
         _logger = logger;
     }
 
-    public async Task<BuildResult> BuildCsProject(string projectFile, bool forceFullRebuild = false, CancellationToken cancellationToken = default)
+    public async Task<BuildResult> Build(string projectFile, bool forceFullRebuild = false, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(projectFile))
         {

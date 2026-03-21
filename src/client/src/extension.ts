@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -44,6 +45,29 @@ function getServerCommand(context: vscode.ExtensionContext): { command: string; 
       : [];
 
   return { command: serverPath, args };
+}
+
+async function validateAndGetProjectUri(folderUri: vscode.Uri): Promise<vscode.Uri | undefined> {
+  try {
+    const entries = await fsPromises.readdir(folderUri.fsPath, { withFileTypes: true });
+    
+    // Look for .sln, .slnx, or .csproj files directly in the folder (not nested)
+    const projectFile = entries.find(entry => 
+      entry.isFile() && (
+        entry.name.endsWith('.sln') ||
+        entry.name.endsWith('.slnx') ||
+        entry.name.endsWith('.csproj')
+      )
+    );
+    
+    if (projectFile) {
+      return vscode.Uri.file(path.join(folderUri.fsPath, projectFile.name));
+    }
+    
+    return undefined;
+  } catch (err) {
+    return undefined;
+  }
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -106,12 +130,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       const filePath = uri.fsPath;
-      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
-        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
+      const stat = await vscode.workspace.fs.stat(uri);
+      const isDirectory = stat.type === vscode.FileType.Directory;
+      
+      if (isDirectory) {
+        const validatedUri = await validateAndGetProjectUri(uri);
+        if (!validatedUri) {
+          vscode.window.showErrorMessage('This folder must contain a .csproj, .sln, or .slnx file directly (not nested).');
+          return;
+        }
+        uri = validatedUri;
+      } else if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj') || filePath.endsWith('.sln') || filePath.endsWith('.slnx'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, .csproj, .sln, or .slnx files, or folders containing these files.');
         return;
       }
       try {
-        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { featureFileUri: uri.toString() });
+        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString() });
         vscode.window.showInformationMessage('Reqnroll: Project rebuild triggered.');
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
@@ -127,12 +161,22 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       const filePath = uri.fsPath;
-      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
-        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
+      const stat = await vscode.workspace.fs.stat(uri);
+      const isDirectory = stat.type === vscode.FileType.Directory;
+      
+      if (isDirectory) {
+        const validatedUri = await validateAndGetProjectUri(uri);
+        if (!validatedUri) {
+          vscode.window.showErrorMessage('This folder must contain a .csproj, .sln, or .slnx file directly (not nested).');
+          return;
+        }
+        uri = validatedUri;
+      } else if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj') || filePath.endsWith('.sln') || filePath.endsWith('.slnx'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, .csproj, .sln, or .slnx files, or folders containing these files.');
         return;
       }
       try {
-        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { featureFileUri: uri.toString(), fullRebuild: true });
+        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString(), fullRebuild: true });
         vscode.window.showInformationMessage('Reqnroll: Project rebuild triggered.');
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
@@ -169,13 +213,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       const filePath = uri.fsPath;
-      if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj'))) {
-        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, or .csproj files.');
+      const stat = await vscode.workspace.fs.stat(uri);
+      const isDirectory = stat.type === vscode.FileType.Directory;
+      
+      if (isDirectory) {
+        vscode.window.showInformationMessage('Reqnroll: Test discovery is not applicable for folders.');
+        return;
+      } else if (!(filePath.endsWith('.feature') || filePath.endsWith('.feature.cs') || filePath.endsWith('.csproj') || filePath.endsWith('.sln') || filePath.endsWith('.slnx'))) {
+        vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, .csproj, .sln, or .slnx files, or folders containing these files.');
         return;
       }
       try {
-        if (filePath.endsWith('.csproj')) {
-          vscode.window.showInformationMessage('Reqnroll: Test discovery is not applicable for .csproj files.');
+        if (filePath.endsWith('.csproj') || filePath.endsWith('.sln') || filePath.endsWith('.slnx')) {
+          vscode.window.showInformationMessage('Reqnroll: Test discovery is not applicable for project/solution files.');
           return;
         }
         discoveryController.removeTestItemsForFile(uri);
