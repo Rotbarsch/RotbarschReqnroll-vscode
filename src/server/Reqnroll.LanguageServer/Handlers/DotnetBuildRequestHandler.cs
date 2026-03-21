@@ -22,9 +22,9 @@ public class DotnetBuildRequestHandler
 
     public Task<BuildResult> HandleStartBuildRequestAsync(StartBuildParams request, CancellationToken cancellationToken)
     {
-        _logger.LogInfo($"startBuild handler invoked for URI: {request.FeatureFileUri}");
+        _logger.LogInfo($"startBuild handler invoked for URI: {request.ReferenceFileUri}");
 
-        var featureFilePath = _documentStorageService.GetFullFilePath(request.FeatureFileUri);
+        var featureFilePath = _documentStorageService.GetFullFilePath(request.ReferenceFileUri);
         if (string.IsNullOrEmpty(featureFilePath))
         {
             return Task.FromResult(new BuildResult
@@ -35,7 +35,7 @@ public class DotnetBuildRequestHandler
             });
         }
 
-        var projectFile = ProjectFileFinder.GetProjectFileOfFeatureFile(featureFilePath);
+        var projectFile = BuildableFileFinder.GetBuildableFileOfReferenceFile(featureFilePath);
 
         if (string.IsNullOrEmpty(projectFile))
         {
@@ -48,15 +48,15 @@ public class DotnetBuildRequestHandler
             });
         }
 
-        return _dotnetBuildService.BuildCsProject(projectFile, false, cancellationToken);
+        return _dotnetBuildService.Build(projectFile, false, cancellationToken);
     }
 
     public Task<BuildResult> HandleForceBuildRequestAsync(StartBuildParams request, CancellationToken cancellationToken)
     {
-        _logger.LogInfo($"forceBuild handler invoked for URI: {request.FeatureFileUri}");
+        _logger.LogInfo($"forceBuild handler invoked for URI: {request.ReferenceFileUri}");
 
-        var featureFilePath = _documentStorageService.GetFullFilePath(request.FeatureFileUri);
-        if (string.IsNullOrEmpty(featureFilePath))
+        var referenceFilePath = _documentStorageService.GetFullFilePath(request.ReferenceFileUri);
+        if (string.IsNullOrEmpty(referenceFilePath))
         {
             return Task.FromResult(new BuildResult
             {
@@ -66,11 +66,11 @@ public class DotnetBuildRequestHandler
             });
         }
 
-        var projectFile = ProjectFileFinder.GetProjectFileOfFeatureFile(featureFilePath);
+        var buildableFile = BuildableFileFinder.GetBuildableFileOfReferenceFile(referenceFilePath);
 
-        if (string.IsNullOrEmpty(projectFile))
+        if (string.IsNullOrEmpty(buildableFile))
         {
-            var message = $"No project file found for feature file: {featureFilePath}";
+            var message = $"No project or solution file found for feature file: {referenceFilePath}";
             _logger.LogWarning(message);
             return Task.FromResult(new BuildResult
             {
@@ -80,6 +80,6 @@ public class DotnetBuildRequestHandler
         }
 
         // Force build: build with restore
-        return _dotnetBuildService.BuildCsProject(projectFile, true, cancellationToken);
+        return _dotnetBuildService.Build(buildableFile, true, cancellationToken);
     }
 }

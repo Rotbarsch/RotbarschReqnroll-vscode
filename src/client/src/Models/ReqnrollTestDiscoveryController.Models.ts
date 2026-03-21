@@ -11,6 +11,7 @@ export interface DiscoveredTest {
   parentId?: string;
   pickleIndex?: number;
   children?: DiscoveredTest[];
+  tags: string[];
 }
 
 export interface TestRange {

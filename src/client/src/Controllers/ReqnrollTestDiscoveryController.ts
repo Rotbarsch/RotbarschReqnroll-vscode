@@ -53,13 +53,91 @@ export class ReqnrollTestDiscoveryController {
         try {
             const tests = await this.sendDiscoverTestsRequest(uri.toString());
 
-            // Add all discovered tests
-            for (const test of tests) {
-                this.addTestItem(test, this.controller.items);
+            // The server returns a root namespace node with features as children
+            // Restructure to: Project → Folders → Features → Scenarios
+            for (const namespaceRoot of tests) {
+                this.addTestItemWithFolderHierarchy(namespaceRoot, this.controller.items, uri);
             }
         } catch (error) {
             console.error(`Test discovery failed for ${uri.toString()}: ${this.formatRequestError(error)}`);
         }
+    }
+
+    /**
+     * Adds a test item while ensuring proper folder hierarchy.
+     * Restructures the namespace-based structure into project/folder/feature hierarchy.
+     */
+    private addTestItemWithFolderHierarchy(test: DiscoveredTest, parent: vscode.TestItemCollection, uri: vscode.Uri): void {
+        // If this is a namespace root (has period-separated ID), parse it to create folder structure
+        if (test.id.includes('.') && test.children && test.children.length > 0) {
+            // Process children and create folder hierarchy for each
+            for (const child of test.children) {
+                this.createFolderHierarchyAndAddFeature(child, parent, uri);
+            }
+        } else {
+            // This is a leaf node (scenario, scenario outline row) - add directly
+            this.addTestItem(test, parent);
+        }
+    }
+
+    /**
+     * Creates folder hierarchy based on feature ID and adds the feature at the appropriate level.
+     * Example: For "Example.MsTest.Features.SubFolder.DeepFolder.ClassName"
+     * Creates: Example.MsTest → Features → SubFolder → DeepFolder → [Feature]
+     */
+    private createFolderHierarchyAndAddFeature(feature: DiscoveredTest, parent: vscode.TestItemCollection, uri: vscode.Uri): void {
+        const parts = feature.id.split('.');
+        
+        // Find where the folder structure starts (look for common folder root names)
+        // Common patterns: Features, Tests, Specs, etc.
+        const folderRootNames = ['Features', 'Tests', 'Specs', 'Test', 'Feature', 'Specifications'];
+        let folderStartIndex = -1;
+        
+        for (let i = 0; i < parts.length - 1; i++) {
+            if (folderRootNames.some(name => parts[i].toLowerCase() === name.toLowerCase())) {
+                folderStartIndex = i;
+                break;
+            }
+        }
+        
+        // If we didn't find a folder root, assume the project is the first part only
+        if (folderStartIndex === -1) {
+            folderStartIndex = 1; // Skip first part (project name)
+        }
+        
+        let currentCollection = parent;
+        
+        // First, create or find the project node (everything before folder root)
+        if (folderStartIndex > 0) {
+            const projectId = parts.slice(0, folderStartIndex).join('.');
+            const projectLabel = parts.slice(0, folderStartIndex).join('.');
+            
+            let projectItem = currentCollection.get(projectId);
+            if (!projectItem) {
+                projectItem = this.controller.createTestItem(projectId, projectLabel, uri);
+                projectItem.range = new vscode.Range(0, 0, 0, 0);
+                currentCollection.add(projectItem);
+            }
+            currentCollection = projectItem.children;
+        }
+        
+        // Create folder nodes from folder root to the parent of the class
+        for (let i = folderStartIndex; i < parts.length - 1; i++) {
+            const segmentId = parts.slice(0, i + 1).join('.');
+            const segmentLabel = parts[i];
+            
+            let folderItem = currentCollection.get(segmentId);
+            if (!folderItem) {
+                folderItem = this.controller.createTestItem(segmentId, segmentLabel, uri);
+                folderItem.range = new vscode.Range(0, 0, 0, 0);
+                currentCollection.add(folderItem);
+            }
+            
+            currentCollection = folderItem.children;
+        }
+        
+        // Now add the actual feature (and its children) at the appropriate level
+        this.addTestItem(feature, currentCollection);
     }
 
     private addTestItem(test: DiscoveredTest, parent: vscode.TestItemCollection): void {
@@ -89,6 +167,12 @@ export class ReqnrollTestDiscoveryController {
         if (test.pickleIndex !== undefined && test.pickleIndex !== null) {
             tags.push(new vscode.TestTag(`pickleIndex:${test.pickleIndex}`));
         }
+
+        // store manually set tags in the test item
+        test.tags.forEach(tag => {
+            tags.push(new vscode.TestTag(tag));
+        });
+
         item.tags = tags;
 
         // Add children recursively

@@ -34,45 +34,49 @@ export class ReqnrollTestRunnerController {
           controller.items.forEach((testItem) => queue.push(testItem));
         }
 
-        // Mark containers as started for UI feedback
+        // Mark selected items as started
         queue.forEach((testItem) => run.started(testItem));
 
-        // Extract only leaf test cases (items without children) from the queue
-        const testCases = this.extractLeafTestCases(queue);
+        // Collect all leaf test cases for UI tracking
+        const allLeaves = this.extractLeafTestCases(queue);
+        allLeaves.forEach((leaf) => run.started(leaf));
 
-        // Mark all leaf test cases as started to show loading indicator
-        testCases.forEach((testItem) => run.started(testItem));
+        try {
+          // Send all leaf tests in a single request (not one per leaf)
+          const results = await this.sendRunTestsRequest(allLeaves);
 
-        // Run tests individually and update UI as each completes
-        await Promise.all(testCases.map(async (testItem) => {
-          try {
-            const results = await this.sendRunTestsRequest([testItem]);
-            
-            for (const result of results) {
-              // Append output message if available
+          // Build a map from result ID to result for fast lookup
+          const resultMap = new Map(results.map(r => [r.id, r]));
+
+          for (const leaf of allLeaves) {
+            const result = resultMap.get(leaf.id);
+            if (result) {
               if (result.message) {
                 run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
               }
 
               if (result.passed) {
-                run.passed(testItem);
+                run.passed(leaf);
               } else {
                 const message = new vscode.TestMessage(result.message ?? 'Test failed');
-                if (result.line !== undefined && testItem.uri) {
+                if (result.line !== undefined && leaf.uri) {
                   message.location = new vscode.Location(
-                    testItem.uri,
+                    leaf.uri,
                     new vscode.Position(result.line, 0)
                   );
                 }
-
-                run.failed(testItem, message);
+                run.failed(leaf, message);
               }
+            } else {
+              run.errored(leaf, new vscode.TestMessage('No test result received'));
             }
-          } catch (error) {
-            const message = this.formatRequestError(error);
-            run.errored(testItem, new vscode.TestMessage(`runTests request failed: ${message}`));
           }
-        }));
+        } catch (error) {
+          const message = this.formatRequestError(error);
+          for (const leaf of allLeaves) {
+            run.errored(leaf, new vscode.TestMessage(`runTests request failed: ${message}`));
+          }
+        }
 
         run.end();
       },
@@ -101,7 +105,8 @@ export class ReqnrollTestRunnerController {
     const tests = testItems.map(item => {
       const testInfo: TestInfo = {
         id: item.id,
-        filePath: this.getFilePath(item)
+        filePath: this.getFilePath(item),
+        isContainer: item.children.size > 0
       };
 
       // Extract parentId from tags
