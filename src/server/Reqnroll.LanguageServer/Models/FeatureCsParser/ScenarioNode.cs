@@ -6,4 +6,5 @@ public record ScenarioNode
     public required string MethodName { get; set; }
     public int? PickleIndex { get; set; }
     public List<ScenarioNode> Children { get; set; } = new();
+    public string[] Tags { get; set; } = [];
 }

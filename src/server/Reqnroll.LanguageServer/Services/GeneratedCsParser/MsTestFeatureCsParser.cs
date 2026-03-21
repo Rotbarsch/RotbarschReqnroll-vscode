@@ -33,6 +33,15 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
         return featureName;
     }
 
+    public string[] GetTags(MethodDeclarationSyntax methodNode)
+    {
+        return methodNode.AttributeLists.SelectMany(x => x.Attributes)
+            .Where(x => x.Name.ToString().Contains("Microsoft.VisualStudio.TestTools.UnitTesting.TestCategoryAttribute") &&
+                        x.ArgumentList?.Arguments is [{ Expression: LiteralExpressionSyntax }, ..])
+            .Select(x => ((LiteralExpressionSyntax)x.ArgumentList!.Arguments[0].Expression).Token.ValueText)
+            .ToArray();
+    }
+
     public string? GetScenarioName(MethodDeclarationSyntax methodNode)
     {
         string? scenarioName = null;

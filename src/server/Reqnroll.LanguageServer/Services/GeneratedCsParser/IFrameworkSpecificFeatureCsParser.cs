@@ -6,6 +6,7 @@ namespace Reqnroll.LanguageServer.Services.GeneratedCsParser;
 public interface IFrameworkSpecificFeatureCsParser
 {
     public string? GetFeatureName(ClassDeclarationSyntax classNode);
+    public string[] GetTags(MethodDeclarationSyntax methodNode);
     public string? GetScenarioName(MethodDeclarationSyntax methodNode);
     bool IsScenarioOutline(MethodDeclarationSyntax method);
     IEnumerable<ExampleRow> GetExampleRows(MethodDeclarationSyntax method);

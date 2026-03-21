@@ -81,8 +81,10 @@ public class ReqnrollTestDiscoveryService
                     Range = FindScenarioRange(featureFileLines, c.ScenarioName),
                     Uri = request.Uri,
                     ParentId= $"{hierarchy.Namespace}.{h.ClassName}.{s.MethodName}",
-                    PickleIndex = c.PickleIndex
+                    PickleIndex = c.PickleIndex,
+                    Tags = []
                 }).ToList(),
+                Tags = s.Tags
             });
             scenarios.AddRange(simpleScenarios);
 
@@ -93,6 +95,7 @@ public class ReqnrollTestDiscoveryService
                 Label = h.FeatureName,
                 Range = FindFeatureRange(featureFileLines, h.FeatureName),
                 Children = scenarios,
+                Tags = []
             });
         }
 
@@ -105,6 +108,7 @@ public class ReqnrollTestDiscoveryService
             Label = hierarchy.Namespace,
             Range = new TestRange { EndCharacter = 0, EndLine = 0, StartCharacter = 0, StartLine = 0 },
             Children = result,
+            Tags = [],
         };
         return [root];
     }

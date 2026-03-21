@@ -105,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Setup test discovery
   const discoveryController = new ReqnrollTestDiscoveryController(
     client,
-    'rotbarsch.reqnrollController',
+    'rotbarsch.reqnroll',
     'Reqnroll'
   );
   const discoveryWatcher = discoveryController.setupTestDiscovery();

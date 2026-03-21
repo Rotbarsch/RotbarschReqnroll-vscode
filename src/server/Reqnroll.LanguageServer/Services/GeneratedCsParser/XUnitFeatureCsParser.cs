@@ -37,6 +37,17 @@ public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
         return featureName;
     }
 
+    public string[] GetTags(MethodDeclarationSyntax methodNode)
+    {
+        return methodNode.AttributeLists.SelectMany(x => x.Attributes)
+            .Where(x => x.Name.ToString().Contains("TraitAttribute") &&
+                        x.ArgumentList?.Arguments is [{ Expression: LiteralExpressionSyntax firstArg }, _, ..] &&
+                        firstArg.IsKind(SyntaxKind.StringLiteralExpression) &&
+                        firstArg.Token.ValueText == "Category")
+            .Select(x => ((LiteralExpressionSyntax)x.ArgumentList!.Arguments[1].Expression).Token.ValueText)
+            .ToArray();
+    }
+
     public string? GetScenarioName(MethodDeclarationSyntax methodNode)
     {
         // The method should have either an attribute whose name contains "FactAttribute" or "TheoryAttribute".

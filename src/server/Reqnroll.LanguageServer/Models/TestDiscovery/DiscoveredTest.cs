@@ -27,4 +27,7 @@ public record DiscoveredTest
 
     [JsonProperty("pickleIndex")]
     public int? PickleIndex { get; set; }
+
+    [JsonProperty("tags")] 
+    public required string[] Tags { get; init; }
 }

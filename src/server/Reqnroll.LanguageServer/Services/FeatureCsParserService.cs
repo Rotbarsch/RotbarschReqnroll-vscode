@@ -50,7 +50,10 @@ public class FeatureCsParserService(VsCodeOutputLogger logger)
                 var scenarioName = testFrameworkParser.GetScenarioName(method);
                 if (scenarioName is null) continue;
 
-                var scenarioNode = new ScenarioNode() { MethodName = methodName, ScenarioName = scenarioName };
+                var scenarioNode = new ScenarioNode() { 
+                    MethodName = methodName, 
+                    ScenarioName = scenarioName, 
+                    Tags = testFrameworkParser.GetTags(method) };
 
                 if (testFrameworkParser.IsScenarioOutline(method))
                 {

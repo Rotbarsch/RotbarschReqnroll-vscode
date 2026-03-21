@@ -167,6 +167,12 @@ export class ReqnrollTestDiscoveryController {
         if (test.pickleIndex !== undefined && test.pickleIndex !== null) {
             tags.push(new vscode.TestTag(`pickleIndex:${test.pickleIndex}`));
         }
+
+        // store manually set tags in the test item
+        test.tags.forEach(tag => {
+            tags.push(new vscode.TestTag(tag));
+        });
+
         item.tags = tags;
 
         // Add children recursively
