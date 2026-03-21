@@ -18,10 +18,13 @@ public class ReqnrollTestRunnerService
     {
         _logger.LogInfo($"runTests handler invoked with {request.Tests.Count} test(s)");
 
+        // Group tests by project file
+        var testsByProject = new Dictionary<string, List<TestInfo>>();
         var result = new List<TestResult>();
+
         foreach (var test in request.Tests)
         {
-            _logger.LogInfo($"Running test {test.Id} from file {test.FilePath}");
+            _logger.LogInfo($"Test {test.Id} from file {test.FilePath}");
 
             var csProjPath = ProjectFileFinder.GetProjectFileOfFeatureFile(test.FilePath);
 
@@ -37,8 +40,16 @@ public class ReqnrollTestRunnerService
                 continue;
             }
 
-            result.AddRange(await _dotnetTestService.RunTestAsync(csProjPath, test.ParentId ?? test.Id, test.PickleIndex));
+            if (!testsByProject.ContainsKey(csProjPath))
+                testsByProject[csProjPath] = new List<TestInfo>();
+            testsByProject[csProjPath].Add(test);
         }
+
+        // Run one dotnet test per project with a combined filter
+        var tasks = testsByProject.Select(async kvp =>
+            await _dotnetTestService.RunTestsBatchAsync(kvp.Key, kvp.Value));
+        var resultArrays = await Task.WhenAll(tasks);
+        result.AddRange(resultArrays.SelectMany(r => r));
 
         return result;
     }

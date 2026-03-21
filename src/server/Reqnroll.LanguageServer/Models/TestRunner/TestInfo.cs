@@ -15,4 +15,7 @@ public class TestInfo
 
     [JsonProperty("pickleIndex")]
     public int? PickleIndex { get; set; }
+
+    [JsonProperty("isContainer")]
+    public bool IsContainer { get; set; }
 }

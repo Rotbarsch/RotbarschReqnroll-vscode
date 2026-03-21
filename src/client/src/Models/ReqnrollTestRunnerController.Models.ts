@@ -8,6 +8,7 @@ export interface TestInfo {
   filePath: string;
   parentId?: string;
   pickleIndex?: number;
+  isContainer?: boolean;
 }
 
 export interface TestResult {
