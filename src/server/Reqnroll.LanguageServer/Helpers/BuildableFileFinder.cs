@@ -5,7 +5,7 @@ public static class BuildableFileFinder
     private const int MaxScanDepth = 15;
     private static readonly string[] BuildableFilePatterns = ["*.sln", "*.slnx", "*.csproj"];
 
-    public static string? GetBuildableFileOfReferenceFile(string featureFilePath)
+    public static string? GetBuildableFileOfReferenceFile(string featureFilePath, bool forceCsProj=false)
     {
         if (string.IsNullOrWhiteSpace(featureFilePath))
         {
@@ -18,6 +18,8 @@ public static class BuildableFileFinder
         {
             foreach (var pattern in BuildableFilePatterns)
             {
+                if (forceCsProj && pattern != "*.csproj") continue;
+
                 var files = Directory.GetFiles(currentDirectory, pattern, SearchOption.TopDirectoryOnly);
                 if (files.Length > 0)
                 {

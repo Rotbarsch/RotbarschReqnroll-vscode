@@ -26,7 +26,7 @@ public class ReqnrollTestRunnerService
         {
             _logger.LogInfo($"Test {test.Id} from file {test.FilePath}");
 
-            var csProjPath = BuildableFileFinder.GetBuildableFileOfReferenceFile(test.FilePath);
+            var csProjPath = BuildableFileFinder.GetBuildableFileOfReferenceFile(test.FilePath, forceCsProj:true);
 
             if (string.IsNullOrEmpty(csProjPath))
             {
