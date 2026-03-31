@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client;
 using Reqnroll.LanguageServer.Models.DotnetBuild;
 
 namespace Reqnroll.LanguageServer.Services;
