@@ -1,11 +1,9 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Reqnroll.LanguageServer.Models.FeatureCsParser;
 
 namespace Reqnroll.LanguageServer.Services.GeneratedCsParser;
 
-public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
+public class MsTestFeatureCsParser : BaseCsParser, IFrameworkSpecificFeatureCsParser
 {
     public string? GetFeatureName(ClassDeclarationSyntax classNode)
     {
@@ -20,13 +18,16 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
 
             var testPropertyAttribute = attributes.FirstOrDefault(attr => attr.Name.ToString().Contains("Microsoft.VisualStudio.TestTools.UnitTesting.TestPropertyAttribute"));
 
-            if (testPropertyAttribute?.ArgumentList?.Arguments is { Count: >= 2 } args &&
-                args[0].Expression is LiteralExpressionSyntax nameLiteral && nameLiteral.IsKind(SyntaxKind.StringLiteralExpression) &&
-                nameLiteral.Token.ValueText == "FeatureTitle" &&
-                args[1].Expression is LiteralExpressionSyntax valueLiteral && valueLiteral.IsKind(SyntaxKind.StringLiteralExpression))
+            if (testPropertyAttribute?.ArgumentList?.Arguments.Count >= 2)
             {
-                featureName = valueLiteral.Token.ValueText;
-                break;
+                var attributeArgumentValues =
+                    testPropertyAttribute?.ArgumentList?.Arguments.Select(a => ResolveExpressionSyntax(a.Expression)).ToList()!;
+
+                if (attributeArgumentValues[0] == "FeatureTitle")
+                {
+                    featureName = attributeArgumentValues[1];
+                    break;
+                }
             }
         }
 
@@ -36,27 +37,26 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
     public string[] GetTags(MethodDeclarationSyntax methodNode)
     {
         return methodNode.AttributeLists.SelectMany(x => x.Attributes)
-            .Where(x => x.Name.ToString().Contains("Microsoft.VisualStudio.TestTools.UnitTesting.TestCategoryAttribute") &&
-                        x.ArgumentList?.Arguments is [{ Expression: LiteralExpressionSyntax }, ..])
-            .Select(x => ((LiteralExpressionSyntax)x.ArgumentList!.Arguments[0].Expression).Token.ValueText)
+            .Where(x => x.Name.ToString().Contains("Microsoft.VisualStudio.TestTools.UnitTesting.TestCategoryAttribute"))
+            .Where(x=>x.ArgumentList?.Arguments != null)
+            .Select(x=>x.ArgumentList!.Arguments.Select(a=>ResolveExpressionSyntax(a.Expression)))
+            .Select(x =>  x.First()!)
             .ToArray();
     }
 
     public string? GetScenarioName(MethodDeclarationSyntax methodNode)
     {
-        string? scenarioName = null;
-
         var scenarioDescriptionAttribute = methodNode.AttributeLists
             .SelectMany(a => a.Attributes)
             .FirstOrDefault(attr => attr.Name.ToString().Contains("Description", StringComparison.OrdinalIgnoreCase));
 
-        if (scenarioDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression is LiteralExpressionSyntax scenarioLiteral &&
-            scenarioLiteral.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            scenarioName = scenarioLiteral.Token.ValueText;
-        }
+        if (scenarioDescriptionAttribute is null) return null;
 
-        return scenarioName;
+        var scenarioExpression = scenarioDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+
+        if(scenarioExpression is null) return null;
+
+        return ResolveExpressionSyntax(scenarioExpression);
     }
 
     public bool IsScenarioOutline(MethodDeclarationSyntax method)
@@ -74,9 +74,7 @@ public class MsTestFeatureCsParser : IFrameworkSpecificFeatureCsParser
         {
             var pickleIndex = (a.ArgumentList!.Arguments[^3].Expression as LiteralExpressionSyntax)?.Token.ValueText ?? "-1";
             var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 3)
-                .Where(x => x.Expression is LiteralExpressionSyntax)
-                .Select(x => x.Expression as LiteralExpressionSyntax)
-                .Select(x => x?.Token.ValueText);
+                .Select(x => ResolveExpressionSyntax(x.Expression));
 
             result.Add(new ExampleRow
             {

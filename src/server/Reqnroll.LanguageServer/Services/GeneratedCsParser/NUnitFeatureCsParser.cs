@@ -1,53 +1,38 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Reqnroll.LanguageServer.Models.FeatureCsParser;
 
 namespace Reqnroll.LanguageServer.Services.GeneratedCsParser;
 
-public class NUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
+public class NUnitFeatureCsParser : BaseCsParser,IFrameworkSpecificFeatureCsParser
 {
     public string? GetFeatureName(ClassDeclarationSyntax classNode)
     {
-        string? featureName = null;
-
         var featureDescriptionAttribute = classNode.AttributeLists
             .SelectMany(a => a.Attributes)
             .FirstOrDefault(attr => attr.Name.ToString().Contains("Description", StringComparison.OrdinalIgnoreCase));
 
-        if (featureDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression is LiteralExpressionSyntax featureLiteral &&
-            featureLiteral.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            featureName = featureLiteral.Token.ValueText;
-        }
-
-        return featureName;
+        var expression = featureDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+        return expression is null ? null : ResolveExpressionSyntax(expression);
     }
 
     public string[] GetTags(MethodDeclarationSyntax methodNode)
     {
         return methodNode.AttributeLists.SelectMany(x => x.Attributes)
             .Where(x => x.Name.ToString().Contains("NUnit.Framework.CategoryAttribute") &&
-                        x.ArgumentList?.Arguments is [{ Expression: LiteralExpressionSyntax }, ..])
-            .Select(x => ((LiteralExpressionSyntax)x.ArgumentList!.Arguments[0].Expression).Token.ValueText)
+                        x.ArgumentList?.Arguments is { Count: > 0 } &&
+                        ResolveExpressionSyntax(x.ArgumentList.Arguments[0].Expression) is not null)
+            .Select(x => ResolveExpressionSyntax(x.ArgumentList!.Arguments[0].Expression)!)
             .ToArray();
     }
 
     public string? GetScenarioName(MethodDeclarationSyntax methodNode)
     {
-        string? scenarioName = null;
-
         var scenarioDescriptionAttribute = methodNode.AttributeLists
             .SelectMany(a => a.Attributes)
             .FirstOrDefault(attr => attr.Name.ToString().Contains("Description", StringComparison.OrdinalIgnoreCase));
 
-        if (scenarioDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression is LiteralExpressionSyntax scenarioLiteral &&
-            scenarioLiteral.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            scenarioName = scenarioLiteral.Token.ValueText;
-        }
-
-        return scenarioName;
+        var expression = scenarioDescriptionAttribute?.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
+        return expression is null ? null : ResolveExpressionSyntax(expression);
     }
 
     public bool IsScenarioOutline(MethodDeclarationSyntax method)
@@ -59,15 +44,16 @@ public class NUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
     public IEnumerable<ExampleRow> GetExampleRows(MethodDeclarationSyntax method)
     {
         var result = new List<ExampleRow>();
-        var relevantAttributes = method.AttributeLists.SelectMany(x => x.Attributes).Where(x=>x.ToString().Contains("TestCaseAttribute"));
+        var relevantAttributes = method.AttributeLists.SelectMany(x => x.Attributes).Where(x => x.ToString().Contains("TestCaseAttribute"));
 
-        foreach (var a in relevantAttributes.Where(x=>x.ArgumentList is not null))
+        foreach (var a in relevantAttributes.Where(x => x.ArgumentList is not null))
         {
-            var pickleIndex = (a.ArgumentList!.Arguments[^2].Expression as LiteralExpressionSyntax)?.Token.ValueText ?? "-1";
-            var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 2)
-                .Where(x=>x.Expression is LiteralExpressionSyntax)
-                .Select(x => x.Expression as LiteralExpressionSyntax)
-                .Select(x => x?.Token.ValueText);
+            var args = a.ArgumentList!.Arguments;
+            var pickleIndex = ResolveExpressionSyntax(args[^2].Expression) ?? "-1";
+            var arguments = args.Take(args.Count - 2)
+                .Select(x => ResolveExpressionSyntax(x.Expression))
+                .Where(s => s is not null)
+                .Select(s => s!);
 
             result.Add(new ExampleRow
             {

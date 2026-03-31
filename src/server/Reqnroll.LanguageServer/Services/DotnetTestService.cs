@@ -1,6 +1,4 @@
-﻿using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using Reqnroll.LanguageServer.Helpers;
+﻿using Reqnroll.LanguageServer.Helpers;
 using Reqnroll.LanguageServer.Models.TestRunner;
 using Reqnroll.LanguageServer.Models.TrxResultParserHelper;
 using System.Diagnostics;
@@ -237,7 +235,7 @@ public class DotnetTestService
 
     private async Task<IEnumerable<TestResult>> RunTestsBatchInternalAsync(string csProjFilePath, List<TestInfo> tests)
     {
-        var batchId = tests.Count == 1 ? tests[0].Id : $"batch_{Guid.NewGuid():N}";
+        var batchId = $"batch_{Guid.NewGuid():N}";
         var trxDir = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "rotbarsch.reqnroll", "test_results", SanitizeFolderName(batchId, null));
         if (Directory.Exists(trxDir)) Directory.Delete(trxDir, true);

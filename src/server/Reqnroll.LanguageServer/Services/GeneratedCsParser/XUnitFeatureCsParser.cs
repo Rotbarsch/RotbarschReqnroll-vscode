@@ -1,11 +1,9 @@
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Reqnroll.LanguageServer.Models.FeatureCsParser;
 
 namespace Reqnroll.LanguageServer.Services.GeneratedCsParser;
 
-public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
+public class XUnitFeatureCsParser : BaseCsParser, IFrameworkSpecificFeatureCsParser
 {
     public string? GetFeatureName(ClassDeclarationSyntax classNode)
     {
@@ -24,13 +22,15 @@ public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
 
             var traitAttribute = attributes.FirstOrDefault(attr => attr.Name.ToString().Contains("TraitAttribute", StringComparison.OrdinalIgnoreCase));
 
-            if (traitAttribute?.ArgumentList?.Arguments is { Count: >= 2 } args &&
-                args[0].Expression is LiteralExpressionSyntax nameLiteral && nameLiteral.IsKind(SyntaxKind.StringLiteralExpression) &&
-                nameLiteral.Token.ValueText == "FeatureTitle" &&
-                args[1].Expression is LiteralExpressionSyntax valueLiteral && valueLiteral.IsKind(SyntaxKind.StringLiteralExpression))
+            if (traitAttribute?.ArgumentList?.Arguments is { Count: >= 2 } args)
             {
-                featureName = valueLiteral.Token.ValueText;
-                break;
+                var name = ResolveExpressionSyntax(args[0].Expression);
+                var value = ResolveExpressionSyntax(args[1].Expression);
+                if (name == "FeatureTitle" && value is not null)
+                {
+                    featureName = value;
+                    break;
+                }
             }
         }
 
@@ -41,10 +41,10 @@ public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
     {
         return methodNode.AttributeLists.SelectMany(x => x.Attributes)
             .Where(x => x.Name.ToString().Contains("TraitAttribute") &&
-                        x.ArgumentList?.Arguments is [{ Expression: LiteralExpressionSyntax firstArg }, _, ..] &&
-                        firstArg.IsKind(SyntaxKind.StringLiteralExpression) &&
-                        firstArg.Token.ValueText == "Category")
-            .Select(x => ((LiteralExpressionSyntax)x.ArgumentList!.Arguments[1].Expression).Token.ValueText)
+                        x.ArgumentList?.Arguments is { Count: > 1 } &&
+                        ResolveExpressionSyntax(x.ArgumentList.Arguments[0].Expression) == "Category" &&
+                        ResolveExpressionSyntax(x.ArgumentList.Arguments[1].Expression) is not null)
+            .Select(x => ResolveExpressionSyntax(x.ArgumentList!.Arguments[1].Expression)!)
             .ToArray();
     }
 
@@ -63,13 +63,8 @@ public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
         var displayNameArgument = factOrTheoryAttribute?.ArgumentList?.Arguments
             .FirstOrDefault(arg => arg.NameEquals?.Name.Identifier.ValueText == "DisplayName");
 
-        if (displayNameArgument?.Expression is LiteralExpressionSyntax displayNameLiteral &&
-            displayNameLiteral.IsKind(SyntaxKind.StringLiteralExpression))
-        {
-            scenarioName = displayNameLiteral.Token.ValueText;
-        }
-
-        return scenarioName;
+        var expression = displayNameArgument?.Expression;
+        return expression is null ? null : ResolveExpressionSyntax(expression);
     }
 
     public bool IsScenarioOutline(MethodDeclarationSyntax method)
@@ -85,11 +80,12 @@ public class XUnitFeatureCsParser : IFrameworkSpecificFeatureCsParser
 
         foreach (var a in relevantAttributes.Where(x => x.ArgumentList is not null))
         {
-            var pickleIndex = (a.ArgumentList!.Arguments[^2].Expression as LiteralExpressionSyntax)?.Token.ValueText ?? "-1";
-            var arguments = a.ArgumentList.Arguments.Take(a.ArgumentList.Arguments.Count - 2)
-                .Where(x => x.Expression is LiteralExpressionSyntax)
-                .Select(x => x.Expression as LiteralExpressionSyntax)
-                .Select(x => x?.Token.ValueText);
+            var args = a.ArgumentList!.Arguments;
+            var pickleIndex = ResolveExpressionSyntax(args[^2].Expression) ?? "-1";
+            var arguments = args.Take(args.Count - 2)
+                .Select(x => ResolveExpressionSyntax(x.Expression))
+                .Where(s => s is not null)
+                .Select(s => s!);
 
             result.Add(new ExampleRow
             {
