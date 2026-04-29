@@ -33,7 +33,7 @@ public class DotnetTestService
         {
             _logger.LogInfo($"Changing parallel execution limit from {_parallelExecutionLimit} to {limit}");
             _parallelExecutionLimit = limit;
-            
+
             // Dispose old semaphore and create new one with updated limit
             var oldLock = _testLock;
             _testLock = new SemaphoreSlim(limit, limit);
@@ -65,7 +65,7 @@ public class DotnetTestService
         }
     }
 
-    public async Task<IEnumerable<TestResult>> RunTestAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex=null)
+    public async Task<IEnumerable<TestResult>> RunTestAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex = null)
     {
         await _testLock.WaitAsync();
         try
@@ -78,10 +78,10 @@ public class DotnetTestService
         }
     }
 
-    private async Task<IEnumerable<TestResult>> RunTestInternalAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex=null)
+    private async Task<IEnumerable<TestResult>> RunTestInternalAsync(string csProjFilePath, string testQualifiedName, int? pickleIndex = null)
     {
         var trxDir = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "rotbarsch.reqnroll", "test_results", SanitizeFolderName(testQualifiedName,pickleIndex));
+            "rotbarsch.reqnroll", "test_results", SanitizeFolderName(testQualifiedName, pickleIndex));
         if (Directory.Exists(trxDir)) Directory.Delete(trxDir, true);
         Directory.CreateDirectory(trxDir);
         var trxFilePath = Path.Join(trxDir, "test_results.trx");
@@ -177,7 +177,7 @@ public class DotnetTestService
         if (testResults is null || (testResults.Count == 0 && process.ExitCode != 0))
         {
             _logger.LogError($"[dotnet test] Process failed with exit code {process.ExitCode}");
-            
+
             return [new TestResult
             {
                 Id = testQualifiedName,
@@ -256,85 +256,113 @@ public class DotnetTestService
 
         var combinedFilter = BuildCombinedFilter(tests);
 
-        var processStartInfo = new ProcessStartInfo
+        // Create a temporary .runsettings file to avoid command-line length limitations on Windows
+        var runSettingsFilePath = Path.Join(trxDir, $"test{Guid.NewGuid():N}.runsettings");
+        var runSettingsContent = $@"<?xml version=""1.0"" encoding=""utf-8""?>
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>{System.Security.SecurityElement.Escape(combinedFilter)}</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>";
+        await File.WriteAllTextAsync(runSettingsFilePath, runSettingsContent);
+
+        try
         {
-            FileName = "dotnet",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
-            WorkingDirectory = Path.GetDirectoryName(csProjFilePath)
-        };
-        processStartInfo.ArgumentList.Add("test");
-        processStartInfo.ArgumentList.Add(csProjFilePath);
-        processStartInfo.ArgumentList.Add("--no-restore");
-        processStartInfo.ArgumentList.Add("--no-build");
-        processStartInfo.ArgumentList.Add("--filter");
-        processStartInfo.ArgumentList.Add(combinedFilter);
-        processStartInfo.ArgumentList.Add("-l:trx;LogFileName=" + trxFilePath);
-
-        _logger.LogInfo("Running dotnet " + string.Join(" ", processStartInfo.ArgumentList));
-
-        var process = new Process { StartInfo = processStartInfo };
-
-        lock (_processListLock)
-        {
-            _runningProcesses.Add(process);
-        }
-
-        var outputBuilder = new StringBuilder();
-        var errorBuilder = new StringBuilder();
-
-        process.OutputDataReceived += (sender, args) =>
-        {
-            if (!string.IsNullOrEmpty(args.Data))
+            var processStartInfo = new ProcessStartInfo
             {
-                outputBuilder.AppendLine(args.Data);
-                _logger.LogInfo($"[dotnet test] {args.Data}");
+                FileName = "dotnet",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(csProjFilePath)
+            };
+            processStartInfo.ArgumentList.Add("test");
+            processStartInfo.ArgumentList.Add(csProjFilePath);
+            processStartInfo.ArgumentList.Add("--no-restore");
+            processStartInfo.ArgumentList.Add("--no-build");
+            processStartInfo.ArgumentList.Add("--settings");
+            processStartInfo.ArgumentList.Add(runSettingsFilePath);
+            processStartInfo.ArgumentList.Add("-l:trx;LogFileName=" + trxFilePath);
+
+            _logger.LogInfo("Running dotnet " + string.Join(" ", processStartInfo.ArgumentList));
+
+            var process = new Process { StartInfo = processStartInfo };
+
+            lock (_processListLock)
+            {
+                _runningProcesses.Add(process);
             }
-        };
 
-        process.ErrorDataReceived += (sender, args) =>
-        {
-            if (!string.IsNullOrEmpty(args.Data))
+            var outputBuilder = new StringBuilder();
+            var errorBuilder = new StringBuilder();
+
+            process.OutputDataReceived += (sender, args) =>
             {
-                errorBuilder.AppendLine(args.Data);
-                _logger.LogWarning($"[dotnet test] {args.Data}");
+                if (!string.IsNullOrEmpty(args.Data))
+                {
+                    outputBuilder.AppendLine(args.Data);
+                    _logger.LogInfo($"[dotnet test] {args.Data}");
+                }
+            };
+
+            process.ErrorDataReceived += (sender, args) =>
+            {
+                if (!string.IsNullOrEmpty(args.Data))
+                {
+                    errorBuilder.AppendLine(args.Data);
+                    _logger.LogWarning($"[dotnet test] {args.Data}");
+                }
+            };
+
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+
+            await process.WaitForExitAsync();
+
+            lock (_processListLock)
+            {
+                _runningProcesses.Remove(process);
             }
-        };
 
-        process.Start();
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
+            var output = outputBuilder.ToString();
+            var error = errorBuilder.ToString();
+            var combinedOutput = string.IsNullOrWhiteSpace(error) ? output : $"{output}\n{error}";
 
-        await process.WaitForExitAsync();
+            var testResults = TrxResultParserHelper.Parse(trxFilePath)?.ToList();
 
-        lock (_processListLock)
-        {
-            _runningProcesses.Remove(process);
-        }
-
-        var output = outputBuilder.ToString();
-        var error = errorBuilder.ToString();
-        var combinedOutput = string.IsNullOrWhiteSpace(error) ? output : $"{output}\n{error}";
-
-        var testResults = TrxResultParserHelper.Parse(trxFilePath)?.ToList();
-
-        if (testResults is null || (testResults.Count == 0 && process.ExitCode != 0))
-        {
-            _logger.LogError($"[dotnet test] Process failed with exit code {process.ExitCode}");
-            return tests.Select(t => new TestResult
+            if (testResults is null || (testResults.Count == 0 && process.ExitCode != 0))
             {
-                Id = t.Id,
-                Message = string.IsNullOrWhiteSpace(combinedOutput)
-                    ? $"Test failed with exit code {process.ExitCode}"
-                    : combinedOutput,
-                Line = 0,
-                Passed = false
-            });
-        }
+                _logger.LogError($"[dotnet test] Process failed with exit code {process.ExitCode}");
+                return tests.Select(t => new TestResult
+                {
+                    Id = t.Id,
+                    Message = string.IsNullOrWhiteSpace(combinedOutput)
+                        ? $"Test failed with exit code {process.ExitCode}"
+                        : combinedOutput,
+                    Line = 0,
+                    Passed = false
+                });
+            }
 
-        return MapTrxResults(testResults, tests);
+            return MapTrxResults(testResults, tests);
+        }
+        finally
+        {
+            // Clean up the temporary .runsettings file
+            try
+            {
+                if (File.Exists(runSettingsFilePath))
+                {
+                    File.Delete(runSettingsFilePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning($"Failed to delete temporary runsettings file: {ex.Message}");
+            }
+        }
     }
 
     private string BuildCombinedFilter(List<TestInfo> tests)
@@ -449,7 +477,7 @@ public class DotnetTestService
         return false;
     }
 
-    private string GetDotNetTestFilterString(string testQualifiedName, int? pickleIndex=null)
+    private string GetDotNetTestFilterString(string testQualifiedName, int? pickleIndex = null)
     {
         if (pickleIndex.HasValue)
         {

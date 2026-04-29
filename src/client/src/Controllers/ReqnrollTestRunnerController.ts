@@ -34,43 +34,23 @@ export class ReqnrollTestRunnerController {
           controller.items.forEach((testItem) => queue.push(testItem));
         }
 
-        // Mark selected items as started
+        // Mark selected parent items as started
         queue.forEach((testItem) => run.started(testItem));
 
-        // Collect all leaf test cases for UI tracking
+        // Collect all leaf test cases for execution
         const allLeaves = this.extractLeafTestCases(queue);
-        allLeaves.forEach((leaf) => run.started(leaf));
+        
+        // Mark all leaf tests as enqueued so users can see what's pending
+        allLeaves.forEach((leaf) => run.enqueued(leaf));
 
         try {
-          // Send all leaf tests in a single request (not one per leaf)
-          const results = await this.sendRunTestsRequest(allLeaves);
+          // Get parallelExecutionLimit setting
+          const config = vscode.workspace.getConfiguration('rotbarsch.reqnroll.test');
+          const parallelLimit = config.get<number>('parallelExecutionLimit', 5);
 
-          // Build a map from result ID to result for fast lookup
-          const resultMap = new Map(results.map(r => [r.id, r]));
-
-          for (const leaf of allLeaves) {
-            const result = resultMap.get(leaf.id);
-            if (result) {
-              if (result.message) {
-                run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
-              }
-
-              if (result.passed) {
-                run.passed(leaf);
-              } else {
-                const message = new vscode.TestMessage(result.message ?? 'Test failed');
-                if (result.line !== undefined && leaf.uri) {
-                  message.location = new vscode.Location(
-                    leaf.uri,
-                    new vscode.Position(result.line, 0)
-                  );
-                }
-                run.failed(leaf, message);
-              }
-            } else {
-              run.errored(leaf, new vscode.TestMessage('No test result received'));
-            }
-          }
+          // Run tests individually with controlled parallelism
+          // Each test will be marked as started right before execution
+          await this.runTestsWithConcurrencyLimit(allLeaves, parallelLimit, run);
         } catch (error) {
           const message = this.formatRequestError(error);
           for (const leaf of allLeaves) {
@@ -82,6 +62,68 @@ export class ReqnrollTestRunnerController {
       },
       true
     );
+  }
+
+  private async runTestsWithConcurrencyLimit(
+    tests: vscode.TestItem[],
+    concurrencyLimit: number,
+    run: vscode.TestRun
+  ): Promise<void> {
+    let activeCount = 0;
+    let index = 0;
+    const results: Promise<void>[] = [];
+
+    const runNext = async (): Promise<void> => {
+      while (index < tests.length) {
+        const currentIndex = index++;
+        const test = tests[currentIndex];
+        
+        await this.runSingleTest(test, run);
+      }
+    };
+
+    // Start up to concurrencyLimit workers
+    const workers = Math.min(concurrencyLimit, tests.length);
+    for (let i = 0; i < workers; i++) {
+      results.push(runNext());
+    }
+
+    // Wait for all workers to complete
+    await Promise.all(results);
+  }
+
+  private async runSingleTest(test: vscode.TestItem, run: vscode.TestRun): Promise<void> {
+    try {
+      // Mark test as started right before execution
+      run.started(test);
+      
+      const results = await this.sendRunTestsRequest([test]);
+      const result = results[0];
+
+      if (result) {
+        if (result.message) {
+          run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
+        }
+
+        if (result.passed) {
+          run.passed(test);
+        } else {
+          const message = new vscode.TestMessage(result.message ?? 'Test failed');
+          if (result.line !== undefined && test.uri) {
+            message.location = new vscode.Location(
+              test.uri,
+              new vscode.Position(result.line, 0)
+            );
+          }
+          run.failed(test, message);
+        }
+      } else {
+        run.errored(test, new vscode.TestMessage('No test result received'));
+      }
+    } catch (error) {
+      const message = this.formatRequestError(error);
+      run.errored(test, new vscode.TestMessage(`Test execution failed: ${message}`));
+    }
   }
 
   private extractLeafTestCases(testItems: vscode.TestItem[]): vscode.TestItem[] {
