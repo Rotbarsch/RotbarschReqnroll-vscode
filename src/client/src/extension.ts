@@ -124,6 +124,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   buildController.setupBuildTriggers();
 
   // Register rebuild command for feature files
+  const buildProject = async (uri: vscode.Uri): Promise<BuildResult | null> => {
+    try {
+      const result = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Building project...', cancellable: false },
+        () => client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString() }) as Promise<BuildResult>
+      );
+      if (result.success) {
+        vscode.window.showInformationMessage(`Reqnroll: ${result.message}`);
+      } else {
+        vscode.window.showWarningMessage(`Reqnroll: ${result.message}`);
+      }
+      return result;
+    } catch (err) {
+      vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
+      return null;
+    }
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand('rotbarsch.reqnroll.forceRebuildProject', async (uri: vscode.Uri) => {
       if (!uri || uri.scheme !== 'file') {
@@ -145,19 +163,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.window.showErrorMessage('This command can only be used on .feature, .feature.cs, .csproj, .sln, or .slnx files, or folders containing these files.');
         return;
       }
-      try {
-        const result = await vscode.window.withProgress(
-          { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Building project...', cancellable: false },
-          () => client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString() }) as Promise<BuildResult>
-        );
-        if (result.success) {
-          vscode.window.showInformationMessage(`Reqnroll: ${result.message}`);
-        } else {
-          vscode.window.showWarningMessage(`Reqnroll: ${result.message}`);
-        }
-      } catch (err) {
-        vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
-      }
+      await buildProject(uri);
     })
   );
 
@@ -212,6 +218,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       try {
+        const buildResult = await buildProject(uri);
+        if (!buildResult?.success) {
+          return;
+        }
         const result = await vscode.window.withProgress(
           { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Refreshing step bindings...', cancellable: false },
           () => client.sendRequest('rotbarsch.reqnroll/refreshBindings', {}) as Promise<{ bindingCount: number }>
@@ -244,6 +254,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       try {
         if (filePath.endsWith('.csproj') || filePath.endsWith('.sln') || filePath.endsWith('.slnx')) {
           vscode.window.showInformationMessage('Reqnroll: Test discovery is not applicable for project/solution files.');
+          return;
+        }
+        const buildResult = await buildProject(uri);
+        if (!buildResult?.success) {
           return;
         }
         discoveryController.removeTestItemsForFile(uri);
