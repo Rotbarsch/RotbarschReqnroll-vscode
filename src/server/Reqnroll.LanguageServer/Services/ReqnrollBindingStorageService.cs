@@ -33,10 +33,11 @@ public class ReqnrollBindingStorageService
     /// <summary>
     /// Identifies
     /// </summary>
-    public async Task ForceRefresh()
+    public async Task<int> ForceRefresh()
     {
         _trackedWorkspaces.Clear();
         await RefreshBindings();
+        return _bindingInfos.Count;
     }
 
     private Task RefreshBindings()

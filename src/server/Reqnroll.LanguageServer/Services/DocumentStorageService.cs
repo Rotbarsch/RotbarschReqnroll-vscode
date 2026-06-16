@@ -33,6 +33,14 @@ public class DocumentStorageService
         _documents.TryRemove(uri.ToString(), out _);
     }
 
+    /// <summary>
+    /// Returns all currently open documents as a snapshot of URI → content pairs.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> GetAll()
+    {
+        return _documents;
+    }
+
     public string? GetFullFilePath(string requestUri)
     {
         var uri = new Uri(requestUri);

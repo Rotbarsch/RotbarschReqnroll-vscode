@@ -5,7 +5,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using Reqnroll.LanguageServer.Services;
-using System.Text.RegularExpressions;
 
 namespace Reqnroll.LanguageServer.Handlers;
 
@@ -16,17 +15,14 @@ namespace Reqnroll.LanguageServer.Handlers;
 public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     private readonly DocumentStorageService _documentStorageService;
-    private readonly ReqnrollBindingStorageService _reqnrollBindingStorageService;
-    private readonly LanguageServerProtocolRequestService _lspRequestService;
+    private readonly FeatureFileDiagnosticsService _diagnosticsService;
     
     public ReqnrollTextDocumentSyncHandler(
         DocumentStorageService documentStorageService,
-        ReqnrollBindingStorageService reqnrollBindingStorageService,
-        LanguageServerProtocolRequestService lspRequestService)
+        FeatureFileDiagnosticsService diagnosticsService)
     {
         _documentStorageService = documentStorageService;
-        _reqnrollBindingStorageService = reqnrollBindingStorageService;
-        _lspRequestService = lspRequestService;
+        _diagnosticsService = diagnosticsService;
     }
 
     /// <summary>
@@ -55,7 +51,7 @@ public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken cancellationToken)
     {
         _documentStorageService.Set(request.TextDocument.Uri, request.TextDocument.Text);
-        PublishDiagnostics(request.TextDocument.Uri, request.TextDocument.Text);
+        _diagnosticsService.PublishDiagnostics(request.TextDocument.Uri, request.TextDocument.Text);
         return Unit.Task;
     }
 
@@ -69,9 +65,8 @@ public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             var change = request.ContentChanges.First();
             if (change.Range == null)
             {
-                // Full document update
                 _documentStorageService.Set(request.TextDocument.Uri, change.Text);
-                PublishDiagnostics(request.TextDocument.Uri, change.Text);
+                _diagnosticsService.PublishDiagnostics(request.TextDocument.Uri, change.Text);
             }
         }
         return Unit.Task;
@@ -85,7 +80,7 @@ public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         if (request.Text != null)
         {
             _documentStorageService.Set(request.TextDocument.Uri, request.Text);
-            PublishDiagnostics(request.TextDocument.Uri, request.Text);
+            _diagnosticsService.PublishDiagnostics(request.TextDocument.Uri, request.Text);
         }
         return Unit.Task;
     }
@@ -97,63 +92,5 @@ public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     {
         _documentStorageService.Remove(request.TextDocument.Uri);
         return Unit.Task;
-    }
-
-    private void PublishDiagnostics(DocumentUri uri, string content)
-    {
-        var diagnostics = AnalyzeDocument(content);
-        
-        var publishParams = new PublishDiagnosticsParams
-        {
-            Uri = uri,
-            Diagnostics = diagnostics
-        };
-        
-        _lspRequestService.PublishDiagnostics(publishParams);
-    }
-
-    private Container<Diagnostic> AnalyzeDocument(string content)
-    {
-        var diagnostics = new List<Diagnostic>();
-        
-        if (string.IsNullOrEmpty(content))
-        {
-            return new Container<Diagnostic>(diagnostics);
-        }
-        
-        var lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-        var stepPattern = new Regex(@"^\s*(Given|When|Then|And|But)\s+(.+)$", RegexOptions.IgnoreCase);
-
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-            var match = stepPattern.Match(line);
-            
-            if (match.Success)
-            {
-                var keyword = match.Groups[1].Value;
-                var stepText = match.Groups[2].Value.Trim();
-                
-                if (!_reqnrollBindingStorageService.HasMatchingBinding(stepText))
-                {
-                    var startCol = line.IndexOf(keyword);
-                    var endCol = line.Length;
-                    
-                    diagnostics.Add(new Diagnostic
-                    {
-                        Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range
-                        {
-                            Start = new Position(i, startCol),
-                            End = new Position(i, endCol)
-                        },
-                        Message = $"No binding found for step: {stepText}",
-                        Severity = DiagnosticSeverity.Warning,
-                        Source = "Reqnroll"
-                    });
-                }
-            }
-        }
-
-        return new Container<Diagnostic>(diagnostics);
     }
 }
