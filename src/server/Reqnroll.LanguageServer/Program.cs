@@ -47,6 +47,7 @@ var server = await LanguageServer.From(options =>
         .WithHandler<ReqnrollDocumentFormattingHandler>()
         .WithHandler<ReqnrollHoverHandler>()
         .WithHandler<ReqnrollDocumentSymbolHandler>()
+        .WithHandler<ReqnrollSemanticTokensHandler>()
         .OnRequest<RunTestsParams, List<TestResult>>("rotbarsch.reqnroll/runTests", (request, ct) =>
         {
             var runner = serviceProvider?.GetService<ReqnrollTestRunnerService>()!;

@@ -2,26 +2,49 @@
   "name": "Reqnroll Feature",
   "scopeName": "source.reqnroll",
   "patterns": [
-    { "include": "#keywords" },
+    { "include": "#featureKeywords" },
+    { "include": "#stepKeywords" },
     { "include": "#tags" },
-    { "include": "#parameters" },
     { "include": "#strings" },
     { "include": "#comments" }
   ],
   "repository": {
-    "keywords": {
+    "featureKeywords": {
       "patterns": [
         {
-          "name": "keyword.control.reqnroll",
-          "match": "^\\s*(Feature|Background|Examples)\\s*:"
+          "begin": "^\\s*(Feature|Background|Examples)\\s*:",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "keyword.control.reqnroll" }
+          },
+          "patterns": [
+            { "include": "#parameters" }
+          ]
         },
         {
-          "name": "keyword.control.reqnroll",
-          "match": "^\\s*(Scenario Outline|Scenario)\\s*:"
-        },
+          "begin": "^\\s*(Scenario Outline|Scenario)\\s*:",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "keyword.control.reqnroll" }
+          },
+          "patterns": [
+            { "include": "#parameters" }
+          ]
+        }
+      ]
+    },
+    "stepKeywords": {
+      "patterns": [
         {
-          "name": "keyword.control.reqnroll",
-          "match": "^\\s*(Given|When|Then|And|But)\\s+"
+          "begin": "^\\s*(Given|When|Then|And|But)\\s+",
+          "end": "$",
+          "beginCaptures": {
+            "0": { "name": "keyword.control.reqnroll" }
+          },
+          "patterns": [
+            { "include": "#parameters" },
+            { "include": "#strings" }
+          ]
         }
       ]
     },
@@ -61,7 +84,7 @@
         },
         {
           "name": "string.quoted.single.reqnroll",
-          "begin": "'",
+          "begin": "(?<![a-zA-Z])'",
           "end": "'",
           "patterns": [
             { "include": "#parameters" }
