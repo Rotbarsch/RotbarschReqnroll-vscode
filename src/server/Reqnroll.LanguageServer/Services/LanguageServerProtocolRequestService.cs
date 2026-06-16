@@ -2,6 +2,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
+using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace Reqnroll.LanguageServer.Services;
 
@@ -40,5 +41,14 @@ public class LanguageServerProtocolRequestService
     public void LogMessage(LogMessageParams messageParams)
     {
         _server.Window.LogMessage(messageParams);
+    }
+
+    /// <summary>
+    /// Asks the client to re-request semantic tokens for all open documents.
+    /// Call this after bindings change so parameter highlighting is updated immediately.
+    /// </summary>
+    public void SendSemanticTokensRefresh()
+    {
+        _server.Workspace.SendSemanticTokensRefresh(new SemanticTokensRefreshParams());
     }
 }

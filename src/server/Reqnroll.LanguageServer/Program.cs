@@ -34,6 +34,7 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton<DocumentStorageService>();
             services.AddSingleton<ReqnrollBindingStorageService>();
             services.AddSingleton<LanguageServerProtocolRequestService>();
+            services.AddSingleton<FeatureFileDiagnosticsService>();
             services.AddSingleton<VsCodeOutputLogger>();
             services.AddSingleton<ReqnrollTestRunnerService>();
             services.AddSingleton<FeatureCsParserService>();
@@ -68,10 +69,15 @@ var server = await LanguageServer.From(options =>
             var buildRequestHandler = serviceProvider?.GetService<DotnetBuildRequestHandler>()!;
             return buildRequestHandler.HandleForceBuildRequestAsync(request, ct);
         })
-        .OnRequest<ForceRefreshBindingsParams>("rotbarsch.reqnroll/refreshBindings", async (request, ct) =>
+        .OnRequest<ForceRefreshBindingsParams, ForceRefreshBindingsResult>("rotbarsch.reqnroll/refreshBindings", async (request, ct) =>
         {
             var bindingStorageService = serviceProvider?.GetService<ReqnrollBindingStorageService>()!;
-            await bindingStorageService.ForceRefresh();
+            var diagnosticsService = serviceProvider?.GetService<FeatureFileDiagnosticsService>()!;
+
+            var count = await bindingStorageService.ForceRefresh();
+            diagnosticsService.RefreshAllOpenDocuments();
+
+            return new ForceRefreshBindingsResult { BindingCount = count };
         })
         .OnInitialize((languageServer, request, token) =>
         {

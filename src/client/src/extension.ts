@@ -12,6 +12,7 @@ import { DotnetBuildController } from './Controllers/DotnetBuildController';
 import { ReqnrollTestDiscoveryController } from './Controllers/ReqnrollTestDiscoveryController';
 import { ReqnrollTestRunnerController } from './Controllers/ReqnrollTestRunnerController';
 import { DotnetVersionChecker } from './DotnetVersionChecker';
+import { BuildResult } from './Models/DotnetBuild.Models';
 
 let client: LanguageClient;
 
@@ -145,8 +146,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       try {
-        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString() });
-        vscode.window.showInformationMessage('Reqnroll: Project rebuild triggered.');
+        const result = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Building project...', cancellable: false },
+          () => client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString() }) as Promise<BuildResult>
+        );
+        if (result.success) {
+          vscode.window.showInformationMessage(`Reqnroll: ${result.message}`);
+        } else {
+          vscode.window.showWarningMessage(`Reqnroll: ${result.message}`);
+        }
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
       }
@@ -176,8 +184,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       try {
-        await client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString(), fullRebuild: true });
-        vscode.window.showInformationMessage('Reqnroll: Project rebuild triggered.');
+        const result = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Rebuilding project (full)...', cancellable: false },
+          () => client.sendRequest('rotbarsch.reqnroll/forceBuild', { referenceFileUri: uri.toString(), fullRebuild: true }) as Promise<BuildResult>
+        );
+        if (result.success) {
+          vscode.window.showInformationMessage(`Reqnroll: ${result.message}`);
+        } else {
+          vscode.window.showWarningMessage(`Reqnroll: ${result.message}`);
+        }
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to trigger project rebuild.');
       }
@@ -197,8 +212,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
       }
       try {
-        await client.sendRequest('rotbarsch.reqnroll/refreshBindings',{});
-        vscode.window.showInformationMessage('Reqnroll: Bindings refreshed.');
+        const result = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Refreshing step bindings...', cancellable: false },
+          () => client.sendRequest('rotbarsch.reqnroll/refreshBindings', {}) as Promise<{ bindingCount: number }>
+        );
+        vscode.window.showInformationMessage(`Reqnroll: Loaded ${result.bindingCount} step binding${result.bindingCount === 1 ? '' : 's'}.`);
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to refresh bindings.');
       }
@@ -229,8 +247,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           return;
         }
         discoveryController.removeTestItemsForFile(uri);
-        await discoveryController.discoverTestsForFile(uri);
-        vscode.window.showInformationMessage('Reqnroll: Test discovery re-run for this file.');
+        const stats = await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: 'Reqnroll: Running test discovery...', cancellable: false },
+          () => discoveryController.discoverTestsForFile(uri)
+        );
+        if (stats) {
+          const scenarioWord = stats.scenarioCount === 1 ? 'scenario' : 'scenarios';
+          const featureWord = stats.featureCount === 1 ? 'feature' : 'features';
+          vscode.window.showInformationMessage(`Reqnroll: Found ${stats.featureCount} ${featureWord} with ${stats.scenarioCount} ${scenarioWord}.`);
+        } else {
+          vscode.window.showWarningMessage('Reqnroll: Test discovery completed but no tests were found.');
+        }
       } catch (err) {
         vscode.window.showErrorMessage('Reqnroll: Failed to re-run test discovery.');
       }

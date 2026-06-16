@@ -49,7 +49,7 @@ export class ReqnrollTestDiscoveryController {
         return watcher;
     }
 
-    public async discoverTestsForFile(uri: vscode.Uri): Promise<void> {
+    public async discoverTestsForFile(uri: vscode.Uri): Promise<{ featureCount: number; scenarioCount: number } | null> {
         try {
             const tests = await this.sendDiscoverTestsRequest(uri.toString());
 
@@ -58,8 +58,21 @@ export class ReqnrollTestDiscoveryController {
             for (const namespaceRoot of tests) {
                 this.addTestItemWithFolderHierarchy(namespaceRoot, this.controller.items, uri);
             }
+
+            // Count features and scenarios across all namespace roots
+            let featureCount = 0;
+            let scenarioCount = 0;
+            for (const namespaceRoot of tests) {
+                const features = namespaceRoot.children ?? [];
+                featureCount += features.length;
+                for (const feature of features) {
+                    scenarioCount += (feature.children ?? []).length;
+                }
+            }
+            return { featureCount, scenarioCount };
         } catch (error) {
             console.error(`Test discovery failed for ${uri.toString()}: ${this.formatRequestError(error)}`);
+            return null;
         }
     }
 

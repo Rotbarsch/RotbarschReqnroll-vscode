@@ -86,10 +86,15 @@ public class DotnetBuildService
 
             await process.WaitForExitAsync(cancellationToken);
 
+            var projectName = Path.GetFileNameWithoutExtension(projectFile);
+            var resultMessage = process.ExitCode == 0
+                ? $"Build succeeded for {projectName}"
+                : $"Build failed for {projectName}";
+
             return new BuildResult
             {
                 Success = process.ExitCode == 0,
-                Message = message,
+                Message = resultMessage,
                 ProjectFile = projectFile
             };
         }
