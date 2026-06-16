@@ -1,4 +1,4 @@
-Feature: Deep Feature in MsTest
+Feature: Deep Feature in NUnit
   This feature is nested three levels deep to test hierarchy
 
 Scenario: Deep scenario test

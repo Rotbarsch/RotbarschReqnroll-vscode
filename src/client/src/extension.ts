@@ -40,10 +40,14 @@ function getServerCommand(context: vscode.ExtensionContext): { command: string; 
     throw new Error(`Reqnroll LSP not found. Tried the following locations:\n  - ${triedPaths}`);
   }
 
-  const args =
-    context.extensionMode === vscode.ExtensionMode.Development
-      ? ['--wait-for-debugger']
-      : [];
+  // Pass --wait-for-debugger only when the developer explicitly opts in via the
+  // environment variable REQNROLL_LSP_DEBUG=1.  Using extensionMode alone is
+  // not sufficient because Playwright tests also launch with
+  // --extensionDevelopmentPath (which sets Development mode) and must not hang
+  // waiting for a debugger to attach.
+  const args = process.env['REQNROLL_LSP_DEBUG'] === '1'
+    ? ['--wait-for-debugger']
+    : [];
 
   return { command: serverPath, args };
 }
