@@ -13,7 +13,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "os": ["win32"],
+  "os": [
+    "win32"
+  ],
   "activationEvents": [
     "onLanguage:reqnroll-feature",
     "onStartupFinished"
@@ -23,8 +25,13 @@
     "languages": [
       {
         "id": "reqnroll-feature",
-        "aliases": ["Reqnroll Feature", "feature"],
-        "extensions": [".feature"]
+        "aliases": [
+          "Reqnroll Feature",
+          "feature"
+        ],
+        "extensions": [
+          ".feature"
+        ]
       }
     ],
     "grammars": [
@@ -53,7 +60,7 @@
       },
       {
         "command": "rotbarsch.reqnroll.forceRebuildProjectFull",
-        "title":"Reqnroll: Rebuild project (full)",
+        "title": "Reqnroll: Rebuild project (full)",
         "category": "Reqnroll"
       },
       {
@@ -114,11 +121,12 @@
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
-    "typescript": "^5.3.0",
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.85.0"
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
   },
   "dependencies": {
+    "jimp": "^1.6.1",
     "vscode-languageclient": "^9.0.1"
   }
 }

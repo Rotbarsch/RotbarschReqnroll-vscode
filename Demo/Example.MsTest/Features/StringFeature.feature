@@ -10,3 +10,4 @@ Examples:
 	| null | null  | null     |
 	| null | bb    | bb       |
 	| $(a) | $(b)  | $(a)$(b) |
+

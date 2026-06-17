@@ -419,3 +419,14 @@ FodyWeavers.xsd
 
 # Ignore generated code files from Reqnroll
 **/*.feature.cs
+
+# Playwright test project (tests/)
+tests/node_modules/
+tests/dist/
+tests/.vscode-test-profile/
+tests/test-results/
+tests/playwright-report/
+
+# Temporary feature files created by Playwright diagnostics tests
+**/_*_Temp.feature
+**/_*_Temp.feature.cs
