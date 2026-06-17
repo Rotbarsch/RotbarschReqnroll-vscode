@@ -84,9 +84,32 @@ export async function launchVSCode(workspacePath: string = DEFAULT_WORKSPACE_PAT
   return { app, page };
 }
 
-/** Closes the VS Code Electron app. */
+/** Closes the VS Code Electron app.
+ *
+ * First attempts a graceful close (app.close()).  If the process does not
+ * exit within 30 seconds — which can happen when VS Code has spawned
+ * long-running child processes such as a dotnet build or the LSP server —
+ * the Electron process is force-killed to avoid exceeding Playwright's
+ * worker teardown timeout.
+ */
 export async function closeVSCode(vscode: VSCodeApp): Promise<void> {
-  await vscode.app.close();
+  // Dismiss any open notifications / dialogs that might block shutdown.
+  try {
+    await vscode.page.keyboard.press('Escape');
+    await vscode.page.waitForTimeout(400);
+  } catch { /* page may already be closed */ }
+
+  try {
+    await Promise.race([
+      vscode.app.close(),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error('VS Code close timeout')), 30_000)
+      ),
+    ]);
+  } catch {
+    // Graceful close timed out; force-kill the Electron process.
+    try { vscode.app.process().kill(); } catch { /* already dead */ }
+  }
 }
 
 /**

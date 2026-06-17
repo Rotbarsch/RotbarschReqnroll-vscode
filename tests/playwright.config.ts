@@ -12,6 +12,13 @@ export default defineConfig({
     video: 'retain-on-failure',
     trace: 'retain-on-failure',
   },
+  expect: {
+    // Long-running LSP operations (build, refresh bindings) can take up to
+    // 90 seconds.  Set the default expect timeout to match so that explicit
+    // { timeout: 90_000 } in individual assertions is not silently capped by
+    // the actionTimeout (30 s).
+    timeout: 90_000,
+  },
   projects: [
     {
       name: 'vscode-electron',
