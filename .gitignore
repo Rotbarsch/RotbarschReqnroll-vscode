@@ -419,3 +419,6 @@ FodyWeavers.xsd
 
 # Ignore generated code files from Reqnroll
 **/*.feature.cs
+/tests/.vscode-test-profile
+/tests/playwright-report
+/tests/**
