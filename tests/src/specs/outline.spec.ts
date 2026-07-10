@@ -30,7 +30,7 @@
 
 import { test, expect, Page } from '@playwright/test';
 import {
-  launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH,
+  launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH, demoFeaturePath,
 } from '../helpers/launch-vscode';
 
 let vscode: VSCodeApp;
@@ -104,7 +104,7 @@ test.describe('Document Outline – Outline panel (Explorer sidebar)', () => {
   test.beforeEach(async () => {
     // Start each test with FirstFeature.feature open so the Outline panel
     // reflects a predictable, simple file structure.
-    await openFileInEditor(vscode.page, 'FirstFeature.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
     await openOutlinePanel(vscode.page);
   });
 
@@ -145,7 +145,7 @@ test.describe('Document Outline – Outline panel (Explorer sidebar)', () => {
     // Background → SymbolKind.Event → "(event)"
     const { page } = vscode;
 
-    await openFileInEditor(page, 'SyntaxShowcase.feature');
+    await openFileInEditor(page, demoFeaturePath('SyntaxShowcase.feature'));
     await page.waitForTimeout(1_500);
 
     await expect(
@@ -161,7 +161,7 @@ test.describe('Document Outline – Outline panel (Explorer sidebar)', () => {
     // Scenario Outline → SymbolKind.Method → "(method)"
     const { page } = vscode;
 
-    await openFileInEditor(page, 'NumbersOutline.feature');
+    await openFileInEditor(page, demoFeaturePath('NumbersOutline.feature'));
     await page.waitForTimeout(1_500);
 
     await expect(
@@ -174,7 +174,7 @@ test.describe('Document Outline – Outline panel (Explorer sidebar)', () => {
 test.describe('Document Outline – Go to Symbol in Editor (Ctrl+Shift+O)', () => {
 
   test.beforeEach(async () => {
-    await openFileInEditor(vscode.page, 'FirstFeature.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
     await vscode.page.waitForTimeout(1_000);
   });
 
@@ -251,7 +251,7 @@ test.describe('Document Outline – Go to Symbol in Editor (Ctrl+Shift+O)', () =
     // (the text after "Background:" in SyntaxShowcase.feature).
     const { page } = vscode;
 
-    await openFileInEditor(page, 'SyntaxShowcase.feature');
+    await openFileInEditor(page, demoFeaturePath('SyntaxShowcase.feature'));
     await page.waitForTimeout(1_000);
 
     await openGoToSymbol(page);
@@ -269,7 +269,7 @@ test.describe('Document Outline – Go to Symbol in Editor (Ctrl+Shift+O)', () =
     // direct navigation to the data table.
     const { page } = vscode;
 
-    await openFileInEditor(page, 'NumbersOutline.feature');
+    await openFileInEditor(page, demoFeaturePath('NumbersOutline.feature'));
     await page.waitForTimeout(1_000);
 
     await openGoToSymbol(page);

@@ -51,4 +51,14 @@ public class LanguageServerProtocolRequestService
     {
         _server.Workspace.SendSemanticTokensRefresh(new SemanticTokensRefreshParams());
     }
+
+    /// <summary>
+    /// Sends an arbitrary custom notification to the client (fire-and-forget, no response expected).
+    /// Used to stream individual test results back to the client as they complete, without
+    /// waiting for the whole runTests request/batch to finish.
+    /// </summary>
+    public void SendNotification<T>(string method, T @params)
+    {
+        _server.SendNotification(method, @params);
+    }
 }
