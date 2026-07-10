@@ -421,4 +421,4 @@ FodyWeavers.xsd
 **/*.feature.cs
 /tests/.vscode-test-profile
 /tests/playwright-report
-/tests/**
+/tests/test-results

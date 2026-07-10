@@ -1,20 +1,19 @@
 using OmniSharp.Extensions.LanguageServer.Server;
 using System.Diagnostics;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OmniSharp.Extensions.LanguageServer.Protocol.General;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 using Reqnroll.LanguageServer.Handlers;
 using Reqnroll.LanguageServer.Models.DotnetBuild;
 using Reqnroll.LanguageServer.Services;
+using Reqnroll.LanguageServer.Services.TestRunning;
 using Reqnroll.LanguageServer.Models.TestDiscovery;
 using Reqnroll.LanguageServer.Models.TestRunner;
 
 #if DEBUG
 if (args.Contains("--wait-for-debugger"))
 {
-    Console.Error.WriteLine("Waiting for debugger (a maximum of 10 seconds)...");
+    Console.Error.WriteLine("Waiting for debugger...");
     Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
@@ -36,12 +35,12 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton<LanguageServerProtocolRequestService>();
             services.AddSingleton<FeatureFileDiagnosticsService>();
             services.AddSingleton<VsCodeOutputLogger>();
+            services.AddSingleton<IVsTestRunner, VsTestConsoleTestRunner>();
             services.AddSingleton<ReqnrollTestRunnerService>();
             services.AddSingleton<FeatureCsParserService>();
             services.AddSingleton<ReqnrollTestDiscoveryService>();
             services.AddSingleton<DotnetBuildService>();
             services.AddSingleton<DotnetBuildRequestHandler>();
-            services.AddSingleton<DotnetTestService>();
         })
         .WithHandler<ReqnrollTextDocumentSyncHandler>()
         .WithHandler<ReqnrollCompletionHandler>()
@@ -111,33 +110,14 @@ var server = await LanguageServer.From(options =>
             }
             return Task.CompletedTask;
         })
-        .OnStarted(async (languageServer, token) =>
+        .OnStarted((languageServer, token) =>
         {
             languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP starting...");
-
-            try
-            {
-                var testService = serviceProvider?.GetService<DotnetTestService>()!;
-                var parallelLimitConfig = await languageServer.Configuration.GetConfiguration(new ConfigurationItem
-                {
-                    Section = "rotbarsch"
-                });
-                var limit = parallelLimitConfig.GetValue<int>("rotbarsch:reqnroll:test:parallelExecutionLimit");
-                testService.SetParallelExecutionLimit(limit);
-            }
-            catch (Exception ex)
-            {
-                languageServer.Window.LogWarning($"Failed to read parallel execution limit configuration: {ex.Message}");
-            }
-
             languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP started.");
+            return Task.CompletedTask;
         })
         .OnExit(_ =>
         {
-            // Kill all running test processes
-            var testService = serviceProvider?.GetService<DotnetTestService>();
-            testService?.KillAllRunningProcesses();
-
             // Clean up test results directory
             var testResultsPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "rotbarsch.reqnroll", "test_results");
             if (Directory.Exists(testResultsPath))

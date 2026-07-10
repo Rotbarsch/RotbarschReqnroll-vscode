@@ -2,7 +2,7 @@
   "name": "rotbarsch-reqnroll-vscode",
   "displayName": "Rotbarsch.Reqnroll",
   "description": "Reqnroll support for VS Code",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "publisher": "Rotbarsch",
   "license": "MIT",
   "icon": "images/icon.png",
@@ -37,12 +37,6 @@
     "configuration": {
       "title": "Reqnroll",
       "properties": {
-        "rotbarsch.reqnroll.test.parallelExecutionLimit": {
-          "type": "number",
-          "default": 5,
-          "minimum": 1,
-          "description": "Maximum number of tests that can run in parallel. Default is 5."
-        }
       }
     },
     "commands": [
