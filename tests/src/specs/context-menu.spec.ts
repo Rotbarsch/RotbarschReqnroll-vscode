@@ -19,7 +19,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH } from '../helpers/launch-vscode';
+import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH, demoFeaturePath } from '../helpers/launch-vscode';
 
 let vscode: VSCodeApp;
 
@@ -27,7 +27,7 @@ test.beforeAll(async () => {
   vscode = await launchVSCode(DEMO_WORKSPACE_PATH);
   // Open a .feature file so the editor "when" clause (resourceExtname == .feature)
   // evaluates to true and the Reqnroll commands appear in the editor context menu.
-  await openFileInEditor(vscode.page, 'FirstFeature.feature');
+  await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
   await vscode.page.waitForTimeout(2_000);
 });
 

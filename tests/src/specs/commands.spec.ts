@@ -24,7 +24,7 @@
  */
 
 import { test, expect, Page } from '@playwright/test';
-import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH } from '../helpers/launch-vscode';
+import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH, demoFeaturePath } from '../helpers/launch-vscode';
 
 let vscode: VSCodeApp;
 
@@ -137,7 +137,7 @@ test.describe('Command Execution – via editor context menu', () => {
     // Commands that operate on the active document require an open .feature
     // file; without one the extension shows a "can only be used on files"
     // error message instead of triggering the LSP request.
-    await openFileInEditor(vscode.page, 'FirstFeature.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
     await vscode.page.waitForTimeout(2_000);
   });
 

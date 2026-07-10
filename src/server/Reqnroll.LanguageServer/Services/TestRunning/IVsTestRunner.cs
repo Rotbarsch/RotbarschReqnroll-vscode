@@ -6,5 +6,11 @@ public interface IVsTestRunner
 {
     Task<IReadOnlyList<DiscoveredTestCase>> DiscoverTestsAsync(string assemblyPath, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<TestExecutionResult>> RunTestsAsync(string assemblyPath, IReadOnlyList<DiscoveredTestCase> testCases, CancellationToken cancellationToken = default);
+    // onTestCompleted (if provided) is invoked as soon as each individual test case finishes,
+    // before the whole batch completes - allowing callers to stream results incrementally.
+    Task<IReadOnlyList<TestExecutionResult>> RunTestsAsync(
+        string assemblyPath,
+        IReadOnlyList<DiscoveredTestCase> testCases,
+        Action<TestExecutionResult>? onTestCompleted = null,
+        CancellationToken cancellationToken = default);
 }

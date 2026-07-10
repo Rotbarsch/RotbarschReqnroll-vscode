@@ -33,7 +33,7 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
 
         try
         {
-            var discoveryHandler = new DiscoveryHandler();
+            var discoveryHandler = new DiscoveryHandler(_logger);
             wrapper.DiscoverTests(new[] { fullAssemblyPath }, null, null, discoveryHandler);
             discoveryHandler.Completed.Wait(cancellationToken);
 
@@ -54,7 +54,11 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         }
     }
 
-    public Task<IReadOnlyList<TestExecutionResult>> RunTestsAsync(string assemblyPath, IReadOnlyList<DiscoveredTestCase> testCases, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<TestExecutionResult>> RunTestsAsync(
+        string assemblyPath,
+        IReadOnlyList<DiscoveredTestCase> testCases,
+        Action<TestExecutionResult>? onTestCompleted = null,
+        CancellationToken cancellationToken = default)
     {
         if (testCases.Count == 0)
         {
@@ -64,25 +68,25 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         var vstestConsolePath = GetVsTestConsolePath();
         if (vstestConsolePath is null)
         {
-            return Task.FromResult<IReadOnlyList<TestExecutionResult>>(Array.Empty<TestExecutionResult>());
+            return Task.FromResult<IReadOnlyList<TestExecutionResult>>(testCases.Select(x=>new TestExecutionResult
+            {
+                DisplayName = x.DisplayName,
+                Outcome = VsTestOutcome.None,
+                FullyQualifiedName = x.FullyQualifiedName,
+                Output = string.Empty
+            }).ToList());
         }
 
         var wrapper = new VsTestConsoleWrapper(vstestConsolePath);
 
         try
         {
-            var runHandler = new RunHandler();
+            var runHandler = new RunHandler(_logger, onTestCompleted);
             wrapper.RunTests(testCases.Select(testCase => testCase.TestCase), null, runHandler);
             runHandler.Completed.Wait(cancellationToken);
 
             IReadOnlyList<TestExecutionResult> results = runHandler.Results
-                .Select(result => new TestExecutionResult
-                {
-                    FullyQualifiedName = result.TestCase.FullyQualifiedName,
-                    DisplayName = result.TestCase.DisplayName,
-                    Outcome = MapOutcome(result.Outcome),
-                    Output = BuildOutput(result),
-                })
+                .Select(ToTestExecutionResult)
                 .ToList();
 
             return Task.FromResult(results);
@@ -92,6 +96,14 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
             wrapper.EndSession();
         }
     }
+
+    private static TestExecutionResult ToTestExecutionResult(Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult result) => new()
+    {
+        FullyQualifiedName = result.TestCase.FullyQualifiedName,
+        DisplayName = result.TestCase.DisplayName,
+        Outcome = MapOutcome(result.Outcome),
+        Output = BuildOutput(result),
+    };
 
     private string? GetVsTestConsolePath()
     {
@@ -137,7 +149,7 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         return standardOutput.Count > 0 ? string.Join(Environment.NewLine, standardOutput) : null;
     }
 
-    private sealed class DiscoveryHandler : ITestDiscoveryEventsHandler2
+    private sealed class DiscoveryHandler(VsCodeOutputLogger logger) : ITestDiscoveryEventsHandler2
     {
         public List<TestCase> DiscoveredTestCases { get; } = new();
 
@@ -163,6 +175,23 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
 
         public void HandleLogMessage(TestMessageLevel level, string? message)
         {
+            if (string.IsNullOrEmpty(message)) return;
+
+            switch (level)
+            {
+                case TestMessageLevel.Informational:
+                    logger.LogInfo(message);
+                    break;
+                case TestMessageLevel.Warning:
+                    logger.LogWarning(message);
+                    break;
+                case TestMessageLevel.Error:
+                    logger.LogError(message);
+                    break;
+                default:
+                    logger.LogInfo($"[{level.ToString()}]" + message);
+                    break;
+            }
         }
 
         public void HandleRawMessage(string rawMessage)
@@ -170,7 +199,7 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         }
     }
 
-    private sealed class RunHandler : ITestRunEventsHandler
+    private sealed class RunHandler(VsCodeOutputLogger logger, Action<TestExecutionResult>? onTestCompleted) : ITestRunEventsHandler
     {
         public List<Microsoft.VisualStudio.TestPlatform.ObjectModel.TestResult> Results { get; } = new();
 
@@ -180,7 +209,11 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         {
             if (testRunChangedArgs?.NewTestResults is not null)
             {
-                Results.AddRange(testRunChangedArgs.NewTestResults);
+                foreach (var result in testRunChangedArgs.NewTestResults)
+                {
+                    Results.Add(result);
+                    onTestCompleted?.Invoke(ToTestExecutionResult(result));
+                }
             }
         }
 
@@ -188,7 +221,11 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
         {
             if (lastChunkArgs?.NewTestResults is not null)
             {
-                Results.AddRange(lastChunkArgs.NewTestResults);
+                foreach (var result in lastChunkArgs.NewTestResults)
+                {
+                    Results.Add(result);
+                    onTestCompleted?.Invoke(ToTestExecutionResult(result));
+                }
             }
 
             Completed.Set();
@@ -198,6 +235,23 @@ public sealed class VsTestConsoleTestRunner : IVsTestRunner
 
         public void HandleLogMessage(TestMessageLevel level, string? message)
         {
+            if (string.IsNullOrEmpty(message)) return;
+
+            switch (level)
+            {
+                case TestMessageLevel.Informational:
+                    logger.LogInfo(message);
+                    break;
+                case TestMessageLevel.Warning:
+                    logger.LogWarning(message);
+                    break;
+                case TestMessageLevel.Error:
+                    logger.LogError(message);
+                    break;
+                default:
+                    logger.LogInfo($"[{level.ToString()}]" + message);
+                    break;
+            }
         }
 
         public void HandleRawMessage(string rawMessage)

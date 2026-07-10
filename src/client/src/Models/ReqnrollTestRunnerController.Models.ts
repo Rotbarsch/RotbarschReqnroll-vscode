@@ -1,6 +1,6 @@
-
 export interface RunTestsParams {
   tests: TestInfo[];
+  runId?: string;
 }
 
 export interface TestInfo {
@@ -16,6 +16,11 @@ export interface TestResult {
   passed: boolean;
   message?: string;
   line?: number;
+}
+
+export interface TestResultNotification {
+  runId: string;
+  result: TestResult;
 }
 
 export interface JsonRpcErrorLike {

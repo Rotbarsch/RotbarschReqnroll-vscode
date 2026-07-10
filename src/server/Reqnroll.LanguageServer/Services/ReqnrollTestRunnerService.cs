@@ -17,12 +17,21 @@ public class ReqnrollTestRunnerService
     }
 
     public async Task<List<TestResult>> HandleRunTestsRequestAsync(RunTestsParams request, CancellationToken cancellationToken)
+        => await HandleRunTestsRequestAsync(request, onTestCompleted: null, cancellationToken);
+
+    public async Task<List<TestResult>> HandleRunTestsRequestAsync(RunTestsParams request, Action<TestResult>? onTestCompleted, CancellationToken cancellationToken)
     {
         _logger.LogInfo($"runTests handler invoked with {request.Tests.Count} test(s)");
 
         // Group tests by project file
         var testsByProject = new Dictionary<string, List<TestInfo>>();
         var result = new List<TestResult>();
+
+        void Report(TestResult testResult)
+        {
+            result.Add(testResult);
+            onTestCompleted?.Invoke(testResult);
+        }
 
         foreach (var test in request.Tests)
         {
@@ -32,7 +41,7 @@ public class ReqnrollTestRunnerService
 
             if (string.IsNullOrEmpty(csProjPath))
             {
-                result.Add(new TestResult
+                Report(new TestResult
                 {
                     Id = test.Id,
                     Message = "Unable to find the project file for the test. Make sure the feature file is part of a project and try again.",
@@ -51,25 +60,19 @@ public class ReqnrollTestRunnerService
         }
 
         // Discover + run once per project, covering all of that project's requested tests.
-        var tasks = testsByProject.Select(kvp => RunTestsForProjectAsync(kvp.Key, kvp.Value, cancellationToken));
+        var tasks = testsByProject.Select(kvp => RunTestsForProjectAsync(kvp.Key, kvp.Value, onTestCompleted, cancellationToken));
         var resultArrays = await Task.WhenAll(tasks);
         result.AddRange(resultArrays.SelectMany(r => r));
 
         return result;
     }
 
-    private async Task<List<TestResult>> RunTestsForProjectAsync(string csProjFilePath, List<TestInfo> tests, CancellationToken cancellationToken)
+    private async Task<List<TestResult>> RunTestsForProjectAsync(string csProjFilePath, List<TestInfo> tests, Action<TestResult>? onTestCompleted, CancellationToken cancellationToken)
     {
         var dllPath = ProjectOutputDllFinder.GetOutputDllPath(csProjFilePath);
         if (dllPath is null || !File.Exists(dllPath))
         {
-            return tests.Select(t => new TestResult
-            {
-                Id = t.Id,
-                Message = "Could not find output DLL for the project. Make sure the project builds successfully.",
-                Line = 0,
-                Passed = false,
-            }).ToList();
+            return Report(tests, onTestCompleted, "Could not find output DLL for the project. Make sure the project builds successfully.");
         }
 
         IReadOnlyList<DiscoveredTestCase> discovered;
@@ -80,24 +83,12 @@ public class ReqnrollTestRunnerService
         catch (Exception ex)
         {
             _logger.LogError($"Test discovery failed for '{dllPath}': {ex.Message}");
-            return tests.Select(t => new TestResult
-            {
-                Id = t.Id,
-                Message = $"Test discovery failed: {ex.Message}",
-                Line = 0,
-                Passed = false,
-            }).ToList();
+            return Report(tests, onTestCompleted, $"Test discovery failed: {ex.Message}");
         }
 
         if (discovered.Count == 0)
         {
-            return tests.Select(t => new TestResult
-            {
-                Id = t.Id,
-                Message = "No tests were discovered in the compiled assembly. Make sure the project builds successfully.",
-                Line = 0,
-                Passed = false,
-            }).ToList();
+            return Report(tests, onTestCompleted, "No tests were discovered in the compiled assembly. Make sure the project builds successfully.");
         }
 
         // Group discovered cases by their base method name (parameters stripped) so that
@@ -110,13 +101,19 @@ public class ReqnrollTestRunnerService
         var matchedTestCases = new List<DiscoveredTestCase>();
         var testInfoByTestCase = new Dictionary<(string FullyQualifiedName, string DisplayName), TestInfo>();
 
+        void ReportOne(TestResult testResult)
+        {
+            result.Add(testResult);
+            onTestCompleted?.Invoke(testResult);
+        }
+
         foreach (var test in tests)
         {
             var baseMethod = test.ParentId ?? test.Id;
 
             if (!discoveredByBaseMethod.TryGetValue(baseMethod, out var candidates) || candidates.Count == 0)
             {
-                result.Add(new TestResult
+                ReportOne(new TestResult
                 {
                     Id = test.Id,
                     Message = "Could not find a matching test in the compiled assembly. Make sure the project has been built with the latest changes.",
@@ -140,7 +137,7 @@ public class ReqnrollTestRunnerService
 
             if (matched is null)
             {
-                result.Add(new TestResult
+                ReportOne(new TestResult
                 {
                     Id = test.Id,
                     Message = "Could not find a matching test in the compiled assembly. Make sure the project has been built with the latest changes.",
@@ -159,17 +156,37 @@ public class ReqnrollTestRunnerService
             return result;
         }
 
-        IReadOnlyList<TestExecutionResult> executionResults;
+        // As each individual test case finishes executing (before the whole batch/project
+        // completes), map it back to its TestInfo/id and report it immediately so the client
+        // doesn't have to wait for the entire run to update the UI.
+        void OnExecutionResult(TestExecutionResult executionResult)
+        {
+            var key = (executionResult.FullyQualifiedName, executionResult.DisplayName);
+            if (!testInfoByTestCase.TryGetValue(key, out var test))
+            {
+                return;
+            }
+
+            ReportOne(new TestResult
+            {
+                Id = test.Id,
+                Message = executionResult.Output,
+                Line = 0,
+                Passed = executionResult.Outcome == VsTestOutcome.Passed,
+            });
+        }
+
         try
         {
-            executionResults = await _testRunner.RunTestsAsync(dllPath, matchedTestCases, cancellationToken);
+            await _testRunner.RunTestsAsync(dllPath, matchedTestCases, OnExecutionResult, cancellationToken);
         }
         catch (Exception ex)
         {
             _logger.LogError($"Running tests failed for '{dllPath}': {ex.Message}");
-            foreach (var test in testInfoByTestCase.Values)
+            var alreadyReportedIds = result.Select(r => r.Id).ToHashSet();
+            foreach (var test in testInfoByTestCase.Values.Where(t => !alreadyReportedIds.Contains(t.Id)))
             {
-                result.Add(new TestResult
+                ReportOne(new TestResult
                 {
                     Id = test.Id,
                     Message = $"Running tests failed: {ex.Message}",
@@ -180,24 +197,28 @@ public class ReqnrollTestRunnerService
             return result;
         }
 
-        foreach (var executionResult in executionResults)
-        {
-            var key = (executionResult.FullyQualifiedName, executionResult.DisplayName);
-            if (!testInfoByTestCase.TryGetValue(key, out var test))
-            {
-                continue;
-            }
+        return result;
+    }
 
-            result.Add(new TestResult
+    private static List<TestResult> Report(List<TestInfo> tests, Action<TestResult>? onTestCompleted, string message)
+    {
+        var results = tests.Select(t => new TestResult
+        {
+            Id = t.Id,
+            Message = message,
+            Line = 0,
+            Passed = false,
+        }).ToList();
+
+        if (onTestCompleted is not null)
+        {
+            foreach (var testResult in results)
             {
-                Id = test.Id,
-                Message = executionResult.Output,
-                Line = 0,
-                Passed = executionResult.Outcome == VsTestOutcome.Passed,
-            });
+                onTestCompleted(testResult);
+            }
         }
 
-        return result;
+        return results;
     }
 
     private static string StripMethodParameters(string fullyQualifiedName)

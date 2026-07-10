@@ -14,7 +14,7 @@ using Reqnroll.LanguageServer.Models.TestRunner;
 if (args.Contains("--wait-for-debugger"))
 {
     Console.Error.WriteLine("Waiting for debugger...");
-    Debugger.Launch();
+    //Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
 #endif
@@ -51,7 +51,23 @@ var server = await LanguageServer.From(options =>
         .OnRequest<RunTestsParams, List<TestResult>>("rotbarsch.reqnroll/runTests", (request, ct) =>
         {
             var runner = serviceProvider?.GetService<ReqnrollTestRunnerService>()!;
-            return runner.HandleRunTestsRequestAsync(request, ct);
+
+            if (string.IsNullOrEmpty(request.RunId))
+            {
+                return runner.HandleRunTestsRequestAsync(request, ct);
+            }
+
+            var protocolRequestService = serviceProvider?.GetService<LanguageServerProtocolRequestService>()!;
+            var runId = request.RunId;
+
+            return runner.HandleRunTestsRequestAsync(request, testResult =>
+            {
+                protocolRequestService.SendNotification("rotbarsch.reqnroll/testResult", new TestResultNotification
+                {
+                    RunId = runId,
+                    Result = testResult,
+                });
+            }, ct);
         })
         .OnRequest<DiscoverTestsParams, List<DiscoveredTest>>("rotbarsch.reqnroll/discoverTests", (request, ct) =>
         {
