@@ -43,14 +43,19 @@ export class ReqnrollTestRunnerController {
         // Mark all leaf tests as enqueued so users can see what's pending
         allLeaves.forEach((leaf) => run.enqueued(leaf));
 
-        try {
-          // Get parallelExecutionLimit setting
-          const config = vscode.workspace.getConfiguration('rotbarsch.reqnroll.test');
-          const parallelLimit = config.get<number>('parallelExecutionLimit', 5);
+        // Mark all leaf tests as started right before execution
+        allLeaves.forEach((leaf) => run.started(leaf));
 
-          // Run tests individually with controlled parallelism
-          // Each test will be marked as started right before execution
-          await this.runTestsWithConcurrencyLimit(allLeaves, parallelLimit, run);
+        try {
+          // Send a single runTests request containing all requested tests,
+          // handled together by the language server.
+          const results = await this.sendRunTestsRequest(allLeaves);
+          const resultsById = new Map(results.map((result) => [result.id, result]));
+
+          for (const leaf of allLeaves) {
+            const result = resultsById.get(leaf.id);
+            this.applyTestResult(leaf, result, run);
+          }
         } catch (error) {
           const message = this.formatRequestError(error);
           for (const leaf of allLeaves) {
@@ -64,65 +69,29 @@ export class ReqnrollTestRunnerController {
     );
   }
 
-  private async runTestsWithConcurrencyLimit(
-    tests: vscode.TestItem[],
-    concurrencyLimit: number,
-    run: vscode.TestRun
-  ): Promise<void> {
-    let activeCount = 0;
-    let index = 0;
-    const results: Promise<void>[] = [];
-
-    const runNext = async (): Promise<void> => {
-      while (index < tests.length) {
-        const currentIndex = index++;
-        const test = tests[currentIndex];
-        
-        await this.runSingleTest(test, run);
-      }
-    };
-
-    // Start up to concurrencyLimit workers
-    const workers = Math.min(concurrencyLimit, tests.length);
-    for (let i = 0; i < workers; i++) {
-      results.push(runNext());
+  private applyTestResult(test: vscode.TestItem, result: TestResult | undefined, run: vscode.TestRun): void {
+    if (!result) {
+      run.errored(test, new vscode.TestMessage('No test result received'));
+      return;
     }
 
-    // Wait for all workers to complete
-    await Promise.all(results);
-  }
+    if (result.message) {
+      // Associate the output with this specific test (3rd arg) so it shows up
+      // in the Test Results view for that test, in addition to the run's output panel.
+      run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'), undefined, test);
+    }
 
-  private async runSingleTest(test: vscode.TestItem, run: vscode.TestRun): Promise<void> {
-    try {
-      // Mark test as started right before execution
-      run.started(test);
-      
-      const results = await this.sendRunTestsRequest([test]);
-      const result = results[0];
-
-      if (result) {
-        if (result.message) {
-          run.appendOutput(result.message.replace(/\r?\n/g, '\r\n'));
-        }
-
-        if (result.passed) {
-          run.passed(test);
-        } else {
-          const message = new vscode.TestMessage(result.message ?? 'Test failed');
-          if (result.line !== undefined && test.uri) {
-            message.location = new vscode.Location(
-              test.uri,
-              new vscode.Position(result.line, 0)
-            );
-          }
-          run.failed(test, message);
-        }
-      } else {
-        run.errored(test, new vscode.TestMessage('No test result received'));
+    if (result.passed) {
+      run.passed(test);
+    } else {
+      const message = new vscode.TestMessage(result.message ?? 'Test failed');
+      if (result.line !== undefined && test.uri) {
+        message.location = new vscode.Location(
+          test.uri,
+          new vscode.Position(result.line, 0)
+        );
       }
-    } catch (error) {
-      const message = this.formatRequestError(error);
-      run.errored(test, new vscode.TestMessage(`Test execution failed: ${message}`));
+      run.failed(test, message);
     }
   }
 
