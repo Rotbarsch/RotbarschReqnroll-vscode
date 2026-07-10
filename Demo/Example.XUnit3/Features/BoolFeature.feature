@@ -11,5 +11,3 @@ Examples:
 	| false | true  | true   |
 	| false | false | false  |
 
-
-	

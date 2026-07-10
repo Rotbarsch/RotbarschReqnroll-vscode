@@ -4,7 +4,7 @@ Scenario Outline: Fun with bool
 	When <left> OR <right>
 	Then the result bool should be <result>
 
-Examples:
+Examples: 
 	| left  | right | result |
 	| true  | true  | true   |
 	| true  | false | true   |
