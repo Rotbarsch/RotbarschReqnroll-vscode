@@ -95,11 +95,7 @@ public class ReqnrollTestRunnerService
             Passed = false,
         }).ToList();
 
-            result.Add(new TestResult
-            {
-                onTestCompleted(testResult);
-            }
-        }
+        foreach (var r in results) onTestCompleted?.Invoke(r);
 
         return results;
     }

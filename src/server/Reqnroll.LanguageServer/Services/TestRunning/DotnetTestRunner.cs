@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
@@ -84,8 +85,6 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
             psi.ArgumentList.Add("--no-build");
             psi.ArgumentList.Add("--settings");
             psi.ArgumentList.Add(runSettingsPath);
-            psi.ArgumentList.Add("--filter");
-            psi.ArgumentList.Add(BuildCombinedFilter(tests));
             psi.ArgumentList.Add("--logger");
             psi.ArgumentList.Add("console;verbosity=detailed");
 
@@ -196,28 +195,16 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         // The requested fully qualified names are still recorded here (as TestRunParameters)
         // so the run configuration is self-describing and traceable.
         var runSettings = new XElement("RunSettings",
-            new XElement("TestRunParameters",
-                tests.Select((test, index) => new XElement("Parameter",
-                    new XAttribute("name", $"reqnrollTest{index}"),
-                    new XAttribute("value", test.Id)))));
+            new XElement("RunConfiguration",
+                new XElement("TestCaeFilter",
+                    string.Join("|", tests.Select(t => t.Id))
+                    )
+                )
+            );
 
         return new XDocument(runSettings).ToString();
     }
-
-    private static string BuildCombinedFilter(IReadOnlyList<TestInfo> tests)
-        => string.Join("|", tests.Select(GetFilterForTest).Distinct());
-
-    private static string GetFilterForTest(TestInfo test)
-    {
-        if (test.PickleIndex.HasValue)
-        {
-            var parentId = test.ParentId ?? test.Id;
-            return $"(FullyQualifiedName~{parentId}&(Name~{test.PickleIndex}|DisplayName~{test.PickleIndex}))";
-        }
-
-        return $"FullyQualifiedName~{test.Id}";
-    }
-
+    
     // Matches a completed test's console display name back to the TestInfo the caller asked to
     // run. Several frameworks (xUnit, MSTest) use the scenario title -- not the raw method name
     // -- as the test's console display name, while others (NUnit) use the raw method name, so a
@@ -225,9 +212,14 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
     private static TestInfo? MatchTest(IReadOnlyList<TestInfo> tests, string displayName, ICollection<string> alreadyReportedIds)
     {
         var strippedDisplayName = StripMethodParameters(displayName);
+        var extractedPickleIndex = ExtractPickleIndex(displayName);
 
         var candidates = tests
-            .Where(t => !alreadyReportedIds.Contains(t.Id) && MatchesBaseName(t, strippedDisplayName))
+            .Where(t => 
+                !alreadyReportedIds.Contains(t.Id) && 
+                MatchTestByNameAndPickle(t, strippedDisplayName, extractedPickleIndex)
+            
+            )
             .ToList();
 
         if (candidates.Count == 0)
@@ -244,17 +236,60 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
                ?? (candidates.Count == 1 ? candidates[0] : null);
     }
 
-    private static bool MatchesBaseName(TestInfo test, string strippedDisplayName)
+    private static bool MatchTestByNameAndPickle(TestInfo test, string strippedDisplayName, int? extractedPickleIndex)
     {
+
         var baseId = test.ParentId ?? test.Id;
         var methodName = baseId.Contains('.') ? baseId[(baseId.LastIndexOf('.') + 1)..] : baseId;
 
+        // Specific rules for Scenario Outlines
+        if (extractedPickleIndex.HasValue)
+        {
+            if (test.PickleIndex != extractedPickleIndex) return false;
+
+            if (methodName.StartsWith(strippedDisplayName, StringComparison.Ordinal)) return true;
+            if (!string.IsNullOrEmpty(test.Label) && test.Label.StartsWith(strippedDisplayName, StringComparison.Ordinal)) return true;
+
+            return false;
+        }
+        
+        // "Normal" scenarios
         if (string.Equals(methodName, strippedDisplayName, StringComparison.Ordinal))
         {
             return true;
         }
 
-        return !string.IsNullOrEmpty(test.Label) && string.Equals(test.Label, strippedDisplayName, StringComparison.Ordinal);
+        if (!string.IsNullOrEmpty(test.Label) && string.Equals(test.Label, strippedDisplayName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+
+        return false;
+    }
+
+    private static int? ExtractPickleIndex(string testDisplayName)
+    {
+        if (string.IsNullOrWhiteSpace(testDisplayName))
+            return null;
+
+        // Pattern matches:
+        // - __pickleIndex: "0" (xUnit2/xUnit3 with colon)
+        // - __pickleIndex:"0" (without space)
+        // - 0 as the 4th parameter (MSTest positional)
+        // - "0" as the 4th parameter (NUnit positional)
+
+        // Try xUnit format first (most specific)
+        var xunitMatch = Regex.Match(testDisplayName, @"__pickleIndex\s*:\s*""(\d+)""");
+        if (xunitMatch.Success && int.TryParse(xunitMatch.Groups[1].Value, out var pickleIndex))
+            return pickleIndex;
+
+        // Try MSTest/NUnit format (last parameter for MSTest, second to last for NUnit)
+        var positionalMatch = Regex.Match(testDisplayName, @"\(([^,]+),([^,]+),([^,]+),""?(\d+)""?");
+        if (positionalMatch.Success && int.TryParse(positionalMatch.Groups[^1].Value, out pickleIndex))
+            return pickleIndex;
+
+        return null;
     }
 
     private static string StripMethodParameters(string fullyQualifiedName)
