@@ -14,7 +14,7 @@ using Reqnroll.LanguageServer.Models.TestRunner;
 if (args.Contains("--wait-for-debugger"))
 {
     Console.Error.WriteLine("Waiting for debugger...");
-    //Debugger.Launch();
+    Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
 #endif
@@ -35,7 +35,7 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton<LanguageServerProtocolRequestService>();
             services.AddSingleton<FeatureFileDiagnosticsService>();
             services.AddSingleton<VsCodeOutputLogger>();
-            services.AddSingleton<IVsTestRunner, VsTestConsoleTestRunner>();
+            services.AddSingleton<IDotnetTestRunner, DotnetTestRunner>();
             services.AddSingleton<ReqnrollTestRunnerService>();
             services.AddSingleton<FeatureCsParserService>();
             services.AddSingleton<ReqnrollTestDiscoveryService>();
@@ -132,15 +132,7 @@ var server = await LanguageServer.From(options =>
             languageServer.Window.LogInfo("Rotbarsch.Reqnroll LSP started.");
             return Task.CompletedTask;
         })
-        .OnExit(_ =>
-        {
-            // Clean up test results directory
-            var testResultsPath = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "rotbarsch.reqnroll", "test_results");
-            if (Directory.Exists(testResultsPath))
-            {
-                Directory.Delete(testResultsPath, true);
-            }
-        });
+        .OnExit(_ => Task.CompletedTask);
 });
 
 await server.WaitForExit;

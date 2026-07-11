@@ -64,7 +64,7 @@ public class FeatureCsParserService(VsCodeOutputLogger logger)
                         exampleRowNodes.Add(new ScenarioNode
                         {
                             MethodName = $"{methodName}[{exampleRow.PickleIndex}]",
-                            ScenarioName = $"{methodName}[{exampleRow.Arguments}]",
+                            ScenarioName = $"{scenarioName}[{exampleRow.Arguments}]",
                             PickleIndex = exampleRow.PickleIndex,
                         });
                     }
