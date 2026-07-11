@@ -12,6 +12,16 @@ const USER_DATA_DIR = path.resolve(__dirname, '../../.vscode-test-profile');
 
 export const DEMO_WORKSPACE_PATH = path.resolve(__dirname, '../../../Demo/Example.NUnit');
 
+/**
+ * Resolves the absolute path to a feature file inside the demo workspace's
+ * Features folder. Always prefer absolute paths with openFileInEditor (see
+ * its docs) so VS Code's Quick Open fuzzy matcher can't pick the wrong file
+ * (e.g. an auto-generated *.feature.cs code-behind file of the same base name).
+ */
+export function demoFeaturePath(fileName: string): string {
+  return path.join(DEMO_WORKSPACE_PATH, 'Features', fileName);
+}
+
 export interface VSCodeApp {
   app: ElectronApplication;
   page: Page;
@@ -113,15 +123,32 @@ export async function closeVSCode(vscode: VSCodeApp): Promise<void> {
 }
 
 /**
- * Opens a file inside the VS Code editor by executing the "Open File" quick-
- * open command via keyboard shortcut (Ctrl+P).
+ * Opens a file inside the VS Code editor via Quick Open (Ctrl+P) by typing
+ * the given absolute path and pressing Enter.
+ *
+ * Note: this deliberately does NOT use Ctrl+O ("File: Open File..."). In the
+ * VS Code desktop (Electron) app, Ctrl+O invokes the native OS "Open File"
+ * dialog via Electron's main-process `dialog.showOpenDialog`, which lives
+ * entirely outside the Chromium renderer that Playwright automates. Playwright's
+ * `page.waitForEvent('filechooser')` only fires for browser-native
+ * `<input type="file">` choosers - it is never raised by that native OS dialog,
+ * so the previous implementation would hang until the wait timed out. Quick
+ * Open, by contrast, is an in-page (DOM) widget that Playwright can drive
+ * directly via the keyboard, which is why it works reliably here.
+ *
+ * @param absolutePath  Full, absolute path of the file to open. Always pass an
+ *                       absolute path (not just a filename) so VS Code's Quick
+ *                       Open fuzzy matcher can't pick the wrong file (e.g. an
+ *                       auto-generated *.feature.cs code-behind file alongside
+ *                       a *.feature file of the same base name).
  */
-export async function openFileInEditor(page: Page, relativePath: string): Promise<void> {
+export async function openFileInEditor(page: Page, absolutePath: string): Promise<void> {
   await page.keyboard.press('Control+p');
   await page.waitForTimeout(500);
-  await page.keyboard.type(relativePath, { delay: 50 });
-  await page.waitForTimeout(800);
+  await page.keyboard.type(absolutePath.replace(/\\/g, '/'), { delay: 30 });
+  await page.waitForTimeout(1_000);
   await page.keyboard.press('Enter');
+
   await page.waitForTimeout(2_000);
 }
 

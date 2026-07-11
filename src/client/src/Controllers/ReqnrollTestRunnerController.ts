@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
-import { TestResult, RunTestsParams, TestInfo, JsonRpcErrorLike } from '../Models/ReqnrollTestRunnerController.Models';
+import { TestResult, TestResultNotification, RunTestsParams, TestInfo, JsonRpcErrorLike } from '../Models/ReqnrollTestRunnerController.Models';
 
+const TEST_RESULT_NOTIFICATION = 'rotbarsch.reqnroll/testResult';
 
 export class ReqnrollTestRunnerController {
   public constructor(
@@ -39,34 +40,67 @@ export class ReqnrollTestRunnerController {
 
         // Collect all leaf test cases for execution
         const allLeaves = this.extractLeafTestCases(queue);
-        
+        const leavesById = new Map(allLeaves.map((leaf) => [leaf.id, leaf]));
+
         // Mark all leaf tests as enqueued so users can see what's pending
         allLeaves.forEach((leaf) => run.enqueued(leaf));
 
         // Mark all leaf tests as started right before execution
         allLeaves.forEach((leaf) => run.started(leaf));
 
+        // Listen for individual test results as they complete, so the UI updates
+        // incrementally instead of waiting for the whole batch to finish.
+        const runId = this.generateRunId();
+        const reportedIds = new Set<string>();
+        const disposable = this.client.onNotification(TEST_RESULT_NOTIFICATION, (notification: TestResultNotification) => {
+          if (notification.runId !== runId) {
+            return;
+          }
+
+          const leaf = leavesById.get(notification.result.id);
+          if (!leaf) {
+            return;
+          }
+
+          reportedIds.add(notification.result.id);
+          this.applyTestResult(leaf, notification.result, run);
+        });
+
         try {
           // Send a single runTests request containing all requested tests,
-          // handled together by the language server.
-          const results = await this.sendRunTestsRequest(allLeaves);
+          // handled together by the language server. Individual results arrive
+          // via the notification handler above as each test finishes; the
+          // response below is only used as a fallback for any test that wasn't
+          // already reported via notification (e.g. older server versions).
+          const results = await this.sendRunTestsRequest(allLeaves, runId);
           const resultsById = new Map(results.map((result) => [result.id, result]));
 
           for (const leaf of allLeaves) {
-            const result = resultsById.get(leaf.id);
-            this.applyTestResult(leaf, result, run);
+            if (reportedIds.has(leaf.id)) {
+              continue;
+            }
+            this.applyTestResult(leaf, resultsById.get(leaf.id), run);
           }
         } catch (error) {
           const message = this.formatRequestError(error);
           for (const leaf of allLeaves) {
+            if (reportedIds.has(leaf.id)) {
+              continue;
+            }
             run.errored(leaf, new vscode.TestMessage(`runTests request failed: ${message}`));
           }
+        } finally {
+          disposable.dispose();
         }
 
         run.end();
       },
       true
     );
+  }
+
+  private generateRunId(): string {
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
   private applyTestResult(test: vscode.TestItem, result: TestResult | undefined, run: vscode.TestRun): void {
@@ -112,7 +146,7 @@ export class ReqnrollTestRunnerController {
     return leafTestCases;
   }
 
-  private async sendRunTestsRequest(testItems: vscode.TestItem[]): Promise<TestResult[]> {
+  private async sendRunTestsRequest(testItems: vscode.TestItem[], runId: string): Promise<TestResult[]> {
     const tests = testItems.map(item => {
       const testInfo: TestInfo = {
         id: item.id,
@@ -138,7 +172,7 @@ export class ReqnrollTestRunnerController {
 
     return await this.client.sendRequest(
       'rotbarsch.reqnroll/runTests',
-      { tests } as RunTestsParams
+      { tests, runId } as RunTestsParams
     ) as TestResult[];
   }
 

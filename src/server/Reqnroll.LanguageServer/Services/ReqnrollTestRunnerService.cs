@@ -26,6 +26,12 @@ public class ReqnrollTestRunnerService
         var testsByProject = new Dictionary<string, List<TestInfo>>();
         var result = new List<TestResult>();
 
+        void Report(TestResult testResult)
+        {
+            result.Add(testResult);
+            onTestCompleted?.Invoke(testResult);
+        }
+
         foreach (var test in request.Tests)
         {
             _logger.LogInfo($"Test {test.Id} from file {test.FilePath}");
@@ -34,7 +40,7 @@ public class ReqnrollTestRunnerService
 
             if (string.IsNullOrEmpty(csProjPath))
             {
-                result.Add(new TestResult
+                Report(new TestResult
                 {
                     Id = test.Id,
                     Message = "Unable to find the project file for the test. Make sure the feature file is part of a project and try again.",
@@ -65,13 +71,7 @@ public class ReqnrollTestRunnerService
         var dllPath = ProjectOutputDllFinder.GetOutputDllPath(csProjFilePath);
         if (dllPath is null || !File.Exists(dllPath))
         {
-            return tests.Select(t => new TestResult
-            {
-                Id = t.Id,
-                Message = "Could not find output DLL for the project. Make sure the project builds successfully.",
-                Line = 0,
-                Passed = false,
-            }).ToList();
+            return Report(tests, onTestCompleted, "Could not find output DLL for the project. Make sure the project builds successfully.");
         }
 
         try
@@ -97,13 +97,10 @@ public class ReqnrollTestRunnerService
 
             result.Add(new TestResult
             {
-                Id = test.Id,
-                Message = executionResult.Output,
-                Line = 0,
-                Passed = executionResult.Outcome == VsTestOutcome.Passed,
-            });
+                onTestCompleted(testResult);
+            }
         }
 
-        return result;
+        return results;
     }
 }

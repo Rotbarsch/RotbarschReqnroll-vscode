@@ -21,7 +21,7 @@
  */
 
 import { test, expect, Page } from '@playwright/test';
-import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH } from '../helpers/launch-vscode';
+import { launchVSCode, closeVSCode, openFileInEditor, VSCodeApp, DEMO_WORKSPACE_PATH, demoFeaturePath } from '../helpers/launch-vscode';
 
 let vscode: VSCodeApp;
 
@@ -101,7 +101,7 @@ async function getTokenClass(page: Page, searchText: string): Promise<string | n
 test.describe('Syntax Highlighting – Language Detection', () => {
   test.beforeEach(async () => {
     // Open a feature file so VS Code applies language detection
-    await openFileInEditor(vscode.page, 'FirstFeature.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
   });
 
   test('feature file is detected as Reqnroll Feature language', async () => {
@@ -128,7 +128,7 @@ test.describe('Syntax Highlighting – Language Detection', () => {
     // Intention: the grammar's single-quote pattern uses a negative lookbehind
     // (?<![a-zA-Z]) so that d'artagnan is NOT treated as a string delimiter.
     // This test confirms the file can be opened and its content is displayed.
-    await openFileInEditor(vscode.page, 'SpecialChars.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('SpecialChars.feature'));
 
     const editor = vscode.page.locator('.monaco-editor').first();
     await expect(editor).toBeVisible({ timeout: 10_000 });
@@ -142,7 +142,7 @@ test.describe('Syntax Highlighting – Keywords visible in editor', () => {
   // FirstFeature.feature contains: Feature, Scenario, When, Then, @firstTest
   test.describe('FirstFeature.feature', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'FirstFeature.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
       await vscode.page.waitForTimeout(1_500);
     });
 
@@ -177,7 +177,7 @@ test.describe('Syntax Highlighting – Keywords visible in editor', () => {
   // NumbersOutline.feature exercises Scenario Outline with <parameters>
   test.describe('NumbersOutline.feature', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'NumbersOutline.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('NumbersOutline.feature'));
       await vscode.page.waitForTimeout(1_500);
     });
 
@@ -203,7 +203,7 @@ test.describe('Syntax Highlighting – Keywords visible in editor', () => {
   // double-quoted strings, single-quoted strings, and tags.
   test.describe('SyntaxShowcase.feature', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'SyntaxShowcase.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('SyntaxShowcase.feature'));
       await vscode.page.waitForTimeout(1_500);
     });
 
@@ -264,7 +264,7 @@ test.describe('Syntax Highlighting – Keywords visible in editor', () => {
 
 test.describe('Syntax Highlighting – Grammar is active', () => {
   test.beforeEach(async () => {
-    await openFileInEditor(vscode.page, 'FirstFeature.feature');
+    await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
     await vscode.page.waitForTimeout(1_500);
   });
 
@@ -289,7 +289,7 @@ test.describe('Syntax Highlighting – Token Colours', () => {
 
   test.describe('FirstFeature.feature token colours', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'FirstFeature.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('FirstFeature.feature'));
       await vscode.page.waitForTimeout(2_000); // grammar tokenisation can be slow on first open
     });
 
@@ -328,7 +328,7 @@ test.describe('Syntax Highlighting – Token Colours', () => {
 
   test.describe('NumbersOutline.feature token colours', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'NumbersOutline.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('NumbersOutline.feature'));
       await vscode.page.waitForTimeout(2_000);
     });
 
@@ -343,7 +343,7 @@ test.describe('Syntax Highlighting – Token Colours', () => {
 
   test.describe('SyntaxShowcase.feature token colours', () => {
     test.beforeEach(async () => {
-      await openFileInEditor(vscode.page, 'SyntaxShowcase.feature');
+      await openFileInEditor(vscode.page, demoFeaturePath('SyntaxShowcase.feature'));
       // Scroll to the top so line 1 (Feature:) is always in the viewport.
       // Individual tests that need a lower line navigate with Ctrl+G.
       await vscode.page.keyboard.press('Control+Home');
