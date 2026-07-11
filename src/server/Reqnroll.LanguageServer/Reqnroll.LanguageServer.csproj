@@ -13,21 +13,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
-    <PackageReference Include="Microsoft.TestPlatform" Version="17.14.1" GeneratePathProperty="true" />
-    <PackageReference Include="Microsoft.TestPlatform.ObjectModel" Version="17.14.1" />
-    <PackageReference Include="Microsoft.TestPlatform.TranslationLayer" Version="17.14.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.5" />
     <PackageReference Include="Rotbarsch.ReqnrollBindingMetadataExtractor" Version="0.0.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Bundle the vstest.console runner (drives xUnit, NUnit and MSTest alike via their VSTest
-         adapters, without Process.Start in our own code) alongside this app's output, since
-         VsTestConsoleWrapper needs a path to it. ExcludeFromSingleFile is required so that
-         `dotnet publish -p:PublishSingleFile=true` (used to produce the VS Code extension's
-         artifacts/lsp output) doesn't sweep these managed assemblies into the single-file
-         bundle, which would leave vstest.console.exe (and its dependent dlls) missing on disk. -->
-    <None Include="$(PkgMicrosoft_TestPlatform)\tools\net462\Common7\IDE\Extensions\TestPlatform\**\*.*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" Link="vstest.console\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

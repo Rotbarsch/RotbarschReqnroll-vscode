@@ -18,4 +18,11 @@ public class TestInfo
 
     [JsonProperty("isContainer")]
     public bool IsContainer { get; set; }
+
+    // The human-readable scenario title, as computed during test discovery. Several test
+    // frameworks (xUnit, MSTest) render this title -- not the raw C# method name -- as the
+    // test's display name in `dotnet test`'s console output, so it's needed to map a completed
+    // test's console output line back to this TestInfo.
+    [JsonProperty("label")]
+    public string? Label { get; set; }
 }

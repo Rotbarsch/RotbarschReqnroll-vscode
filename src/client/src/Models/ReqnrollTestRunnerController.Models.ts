@@ -9,6 +9,7 @@ export interface TestInfo {
   parentId?: string;
   pickleIndex?: number;
   isContainer?: boolean;
+  label?: string;
 }
 
 export interface TestResult {
