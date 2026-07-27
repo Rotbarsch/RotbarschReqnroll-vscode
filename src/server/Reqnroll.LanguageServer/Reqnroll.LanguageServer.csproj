@@ -17,4 +17,10 @@
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.5" />
     <PackageReference Include="Rotbarsch.ReqnrollBindingMetadataExtractor" Version="0.0.2" />
   </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Rotbarsch.Reqnroll.VsTestConsoleLogger\Rotbarsch.Reqnroll.VsTestConsoleLogger.csproj" >
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </ProjectReference>
+  </ItemGroup>
 </Project>
