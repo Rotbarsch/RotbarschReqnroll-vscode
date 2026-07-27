@@ -1,9 +1,13 @@
 using System.Diagnostics;
-using System.Reflection.Metadata.Ecma335;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using TestOutcome = Microsoft.VisualStudio.TestPlatform.ObjectModel.TestOutcome;
+using Newtonsoft.Json;
 using Reqnroll.LanguageServer.Models.TestRunner;
+using Rotbarsch.Reqnroll.VsTestConsoleLogger;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Reqnroll.LanguageServer.Services.TestRunning;
 
@@ -38,26 +42,42 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         Action<TestResult>? onTestCompleted = null,
         CancellationToken cancellationToken = default)
     {
+        var framework = GetFramework(csProjFilePath);
+
         if (tests.Count == 0)
         {
             return Array.Empty<TestResult>();
         }
 
-        var runSettingsPath = Path.Combine(Path.GetTempPath(), $"rotbarsch.reqnroll_{Guid.NewGuid():N}.runsettings");
-        File.WriteAllText(runSettingsPath, BuildRunSettings(tests));
+        var baseDir = Path.Combine(Path.GetTempPath(), "rotbarsch.reqnrollvscode");
+        if (!Directory.Exists(baseDir))
+        {
+            Directory.CreateDirectory(baseDir);
+        }
+
+        var runSettingsDir = Path.Combine(baseDir, "runsettings");
+        if (!Directory.Exists(runSettingsDir))
+        {
+            Directory.CreateDirectory(runSettingsDir);
+        }
+
+        var runSettingsPath = Path.Combine(runSettingsDir, $"rotbarsch.reqnroll_{Guid.NewGuid():N}.runsettings");
+        await File.WriteAllTextAsync(runSettingsPath, BuildRunSettings(tests, framework), cancellationToken);
 
         try
         {
             var reported = new Dictionary<string, TestResult>();
 
-            void ReportOne(TestInfo test, bool passed, string? message)
+            void ReportSingleTestResultToClient(TestInfo test, TestResultInfo info)
             {
+                var message = !string.IsNullOrWhiteSpace(info.ErrorMessage)
+                    ? info.ErrorMessage
+                    : !string.IsNullOrWhiteSpace(info.Messages) ? info.Messages : null;
                 var testResult = new TestResult
                 {
                     Id = test.Id,
+                    Passed = info.Outcome == TestOutcome.Passed,
                     Message = message,
-                    Line = 0,
-                    Passed = passed,
                 };
                 reported[test.Id] = testResult;
                 onTestCompleted?.Invoke(testResult);
@@ -71,73 +91,49 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
                 RedirectStandardError = true,
                 CreateNoWindow = true,
                 WorkingDirectory = Path.GetDirectoryName(csProjFilePath),
+                EnvironmentVariables =
+                {
+                    ["DOTNET_CLI_UI_LANGUAGE"] = "en",
+                    ["PreferredUILang"] = "en-US"
+                }
             };
-
-            // The console logger's output (e.g. "Passed"/"Failed"/"Skipped") is localized based
-            // on the OS UI culture, which would break the regex-based parsing below on non-English
-            // systems. Force English so parsing is reliable regardless of the user's OS language.
-            psi.EnvironmentVariables["DOTNET_CLI_UI_LANGUAGE"] = "en";
-            psi.EnvironmentVariables["PreferredUILang"] = "en-US";
-
+            
             psi.ArgumentList.Add("test");
             psi.ArgumentList.Add(csProjFilePath);
             psi.ArgumentList.Add("--no-restore");
             psi.ArgumentList.Add("--no-build");
             psi.ArgumentList.Add("--settings");
             psi.ArgumentList.Add(runSettingsPath);
+            psi.ArgumentList.Add("--test-adapter-path");
+            psi.ArgumentList.Add(AppContext.BaseDirectory);
             psi.ArgumentList.Add("--logger");
-            psi.ArgumentList.Add("console;verbosity=detailed");
+            psi.ArgumentList.Add(MinimalConsoleLogger.LoggerName);
 
             _logger.LogInfo("Running dotnet " + string.Join(" ", psi.ArgumentList));
 
             using var process = new Process { StartInfo = psi };
             var combinedOutput = new StringBuilder();
 
-            // Accumulate the current test's result block (its outcome line plus any error
-            // message/stack trace/standard output lines that follow) until the next test's
-            // result line (or the end of the process) tells us the block is complete.
-            string? pendingStatus = null;
-            string? pendingDisplayName = null;
-            var pendingOutput = new StringBuilder();
-
-            void FlushPending()
+            process.OutputDataReceived += (o, s) =>
             {
-                if (pendingStatus is null || pendingDisplayName is null)
-                {
-                    return;
-                }
+                if (string.IsNullOrEmpty(s.Data)) return;
 
-                var test = MatchTest(tests, pendingDisplayName, reported.Keys);
-                if (test is not null)
-                {
-                    ReportOne(test, passed: pendingStatus == "Passed", message: TrimOrNull(pendingOutput.ToString()));
-                }
+                combinedOutput.AppendLine(s.Data);
+                _logger.LogInfo($"[dotnet test] {s.Data}");
 
-                pendingStatus = null;
-                pendingDisplayName = null;
-                pendingOutput.Clear();
-            }
-
-            process.OutputDataReceived += (_, args) =>
-            {
-                if (args.Data is null)
+                // Such a message only appears once per test, indicating its result
+                if (s.Data.StartsWith($"[{MinimalConsoleLogger.LoggerName}]"))
                 {
-                    return;
-                }
+                    var json = s.Data.Split($"[{MinimalConsoleLogger.LoggerName}]").Skip(1).SingleOrDefault();
+                    if (string.IsNullOrEmpty(json)) return;
 
-                combinedOutput.AppendLine(args.Data);
-                _logger.LogInfo($"[dotnet test] {args.Data}");
-
-                var match = ResultLineRegex.Match(args.Data);
-                if (match.Success)
-                {
-                    FlushPending();
-                    pendingStatus = match.Groups[1].Value;
-                    pendingDisplayName = match.Groups[2].Value.Trim();
-                }
-                else if (pendingStatus is not null && !string.IsNullOrWhiteSpace(args.Data))
-                {
-                    pendingOutput.AppendLine(args.Data.Trim());
+                    var info = JsonSerializer.Deserialize<TestResultInfo>(json)!;
+                    
+                    var test = MatchTestFromTestResult(tests, info, reported.Keys);
+                    if (test is not null)
+                    {
+                        ReportSingleTestResultToClient(test, info);
+                    }
                 }
             };
 
@@ -153,23 +149,24 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-
             await process.WaitForExitAsync(cancellationToken);
-            FlushPending();
 
-            // Any requested test that never produced a recognizable result line (e.g. the
-            // project failed to build, the filter matched nothing, or the output format
-            // couldn't be parsed) is reported as a failure using whatever output we captured.
             var unreported = tests.Where(t => !reported.ContainsKey(t.Id)).ToList();
             if (unreported.Count > 0)
             {
-                var message = combinedOutput.Length > 0
+                var failMessage = combinedOutput.Length > 0
                     ? combinedOutput.ToString()
                     : $"dotnet test exited with code {process.ExitCode} without reporting a result for this test.";
-
                 foreach (var test in unreported)
                 {
-                    ReportOne(test, passed: false, message: message);
+                    var failResult = new TestResult
+                    {
+                        Id = test.Id,
+                        Passed = false,
+                        Message = failMessage,
+                    };
+                    reported[test.Id] = failResult;
+                    onTestCompleted?.Invoke(failResult);
                 }
             }
 
@@ -188,16 +185,40 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         }
     }
 
-    private static string BuildRunSettings(IReadOnlyList<TestInfo> tests)
+    private TestFramework GetFramework(string csProjFilePath)
     {
-        // .runsettings has no native concept of "run exactly these tests" that works across
-        // xUnit/NUnit/MSTest -- actual test selection is done via the --filter argument below.
-        // The requested fully qualified names are still recorded here (as TestRunParameters)
-        // so the run configuration is self-describing and traceable.
+        XDocument csproj;
+        try
+        {
+            csproj = XDocument.Load(csProjFilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Could not read {csProjFilePath} to detect test framework: {ex.Message}");
+            return TestFramework.MsTest;
+        }
+
+        var packageRefs = csproj.Descendants()
+            .Where(e => e.Name.LocalName == "PackageReference")
+            .Select(e => (e.Attribute("Include") ?? e.Attribute("include"))?.Value ?? string.Empty)
+            .Where(name => !string.IsNullOrEmpty(name))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        if (packageRefs.Any(p => p.StartsWith("xunit", StringComparison.OrdinalIgnoreCase)))
+            return TestFramework.XUnit;
+
+        if (packageRefs.Any(p => p.StartsWith("NUnit", StringComparison.OrdinalIgnoreCase)))
+            return TestFramework.NUnit;
+
+        return TestFramework.MsTest;
+    }
+
+    private static string BuildRunSettings(IReadOnlyList<TestInfo> tests, TestFramework framework)
+    {
         var runSettings = new XElement("RunSettings",
             new XElement("RunConfiguration",
-                new XElement("TestCaeFilter",
-                    string.Join("|", tests.Select(t => t.Id))
+                new XElement("TestCaseFilter",
+                    string.Join("|", tests.Select(t=>GetTestAddress(t, framework)))
                     )
                 )
             );
@@ -205,89 +226,46 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         return new XDocument(runSettings).ToString();
     }
     
-    // Matches a completed test's console display name back to the TestInfo the caller asked to
-    // run. Several frameworks (xUnit, MSTest) use the scenario title -- not the raw method name
-    // -- as the test's console display name, while others (NUnit) use the raw method name, so a
-    // candidate is accepted if the stripped display name matches either.
-    private static TestInfo? MatchTest(IReadOnlyList<TestInfo> tests, string displayName, ICollection<string> alreadyReportedIds)
+    private static TestInfo? MatchTestFromTestResult(IReadOnlyList<TestInfo> tests, TestResultInfo info, IEnumerable<string> alreadyReportedIds)
     {
-        var strippedDisplayName = StripMethodParameters(displayName);
-        var extractedPickleIndex = ExtractPickleIndex(displayName);
+        var alreadyReported = new HashSet<string>(alreadyReportedIds);
+        var fqn = StripMethodParameters(info.FullyQualifiedName ?? string.Empty);
+        var extractedPickleIndex = ExtractPickleIndex(info.DisplayName ?? string.Empty);
 
-        var candidates = tests
-            .Where(t => 
-                !alreadyReportedIds.Contains(t.Id) && 
-                MatchTestByNameAndPickle(t, strippedDisplayName, extractedPickleIndex)
-            
-            )
-            .ToList();
+        // Direct match for simple (non-parameterized) tests
+        var direct = tests.FirstOrDefault(t =>
+            !alreadyReported.Contains(t.Id) &&
+            t.PickleIndex is null &&
+            string.Equals(t.Id, fqn, StringComparison.Ordinal));
+        if (direct is not null) return direct;
 
-        if (candidates.Count == 0)
-        {
-            return null;
-        }
-
-        if (candidates.Count == 1 && !candidates[0].PickleIndex.HasValue)
-        {
-            return candidates[0];
-        }
-
-        return candidates.FirstOrDefault(t => t.PickleIndex.HasValue && TestNameContainsPickleIndex(displayName, t.PickleIndex.Value))
-               ?? (candidates.Count == 1 ? candidates[0] : null);
-    }
-
-    private static bool MatchTestByNameAndPickle(TestInfo test, string strippedDisplayName, int? extractedPickleIndex)
-    {
-
-        var baseId = test.ParentId ?? test.Id;
-        var methodName = baseId.Contains('.') ? baseId[(baseId.LastIndexOf('.') + 1)..] : baseId;
-
-        // Specific rules for Scenario Outlines
+        // Parameterized: match by ParentId + PickleIndex from display name
         if (extractedPickleIndex.HasValue)
         {
-            if (test.PickleIndex != extractedPickleIndex) return false;
-
-            if (methodName.StartsWith(strippedDisplayName, StringComparison.Ordinal)) return true;
-            if (!string.IsNullOrEmpty(test.Label) && test.Label.StartsWith(strippedDisplayName, StringComparison.Ordinal)) return true;
-
-            return false;
-        }
-        
-        // "Normal" scenarios
-        if (string.Equals(methodName, strippedDisplayName, StringComparison.Ordinal))
-        {
-            return true;
+            var paramMatch = tests.FirstOrDefault(t =>
+                !alreadyReported.Contains(t.Id) &&
+                t.PickleIndex == extractedPickleIndex &&
+                string.Equals(t.ParentId, fqn, StringComparison.Ordinal));
+            if (paramMatch is not null) return paramMatch;
         }
 
-        if (!string.IsNullOrEmpty(test.Label) && string.Equals(test.Label, strippedDisplayName, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-
-        return false;
+        return null;
     }
 
-    private static int? ExtractPickleIndex(string testDisplayName)
+    private static int? ExtractPickleIndex(string displayName)
     {
-        if (string.IsNullOrWhiteSpace(testDisplayName))
+        if (string.IsNullOrWhiteSpace(displayName))
             return null;
 
-        // Pattern matches:
-        // - __pickleIndex: "0" (xUnit2/xUnit3 with colon)
-        // - __pickleIndex:"0" (without space)
-        // - 0 as the 4th parameter (MSTest positional)
-        // - "0" as the 4th parameter (NUnit positional)
+        // xUnit: named parameter __pickleIndex: "N"
+        var xunitMatch = Regex.Match(displayName, @"__pickleIndex\s*:\s*""(\d+)""");
+        if (xunitMatch.Success && int.TryParse(xunitMatch.Groups[1].Value, out var xunitIndex))
+            return xunitIndex;
 
-        // Try xUnit format first (most specific)
-        var xunitMatch = Regex.Match(testDisplayName, @"__pickleIndex\s*:\s*""(\d+)""");
-        if (xunitMatch.Success && int.TryParse(xunitMatch.Groups[1].Value, out var pickleIndex))
-            return pickleIndex;
-
-        // Try MSTest/NUnit format (last parameter for MSTest, second to last for NUnit)
-        var positionalMatch = Regex.Match(testDisplayName, @"\(([^,]+),([^,]+),([^,]+),""?(\d+)""?");
-        if (positionalMatch.Success && int.TryParse(positionalMatch.Groups[^1].Value, out pickleIndex))
-            return pickleIndex;
+        // MSTest/NUnit: pickle index is last (or second-to-last before null) positional parameter
+        var positionalMatch = Regex.Match(displayName, @"\(([^,]+),([^,]+),([^,]+),""?(\d+)""?");
+        if (positionalMatch.Success && int.TryParse(positionalMatch.Groups[^1].Value, out var positionalIndex))
+            return positionalIndex;
 
         return null;
     }
@@ -298,30 +276,40 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         return parenIndex >= 0 ? fullyQualifiedName[..parenIndex] : fullyQualifiedName;
     }
 
-    private static bool TestNameContainsPickleIndex(string displayName, int pickleIndex)
+    private static string GetTestAddress(TestInfo arg, TestFramework framework)
     {
-        var idx = pickleIndex.ToString();
+        /*
+        <TestCaseFilter>
+            <!-- MSTest -->
+            FullyQualifiedName~Features.SubFolder.AFeatureWithBooleansInASubfolderFeature.FunWithBool &amp; Name~,0 
+            
+            <!-- xUnit -->
+            FullyQualifiedName~Features.SubFolder.AFeatureWithBooleansInASubfolderFeature.FunWithBool &amp; DisplayName~pickleIndex: "0"
+        </TestCaseFilter>
+         */
 
-        // xUnit: named parameter __pickleIndex: "N"
-        if (displayName.Contains($"__pickleIndex: \"{idx}\""))
-            return true;
+        // No action needed for simple tests (TestMethod, Fact,...)
+        if (arg.PickleIndex is null) return arg.Id;
 
-        // NUnit: positional params, pickle is second-to-last before null/array
-        // e.g. FunWithBool("true","true","true","0",null)
-        if (Regex.IsMatch(displayName, "\"" + Regex.Escape(idx) + "\"" + @"\s*,\s*(null|\[.*?\])\s*\)\s*$"))
-            return true;
+        // DataRow/Theory tests on the other hand require some extra attention.
 
-        // MSTest: pickle index is last value in display name
-        // e.g. "Fun with bool(true,true,true,0)"
-        if (Regex.IsMatch(displayName, @",\s*" + Regex.Escape(idx) + @"\s*\)\s*$"))
-            return true;
-
-        return false;
+        switch (framework)
+        {
+            case TestFramework.MsTest:
+                return $"FullyQualifiedName~{arg.ParentId} & Name~,{arg.PickleIndex}";
+            case TestFramework.XUnit:
+                return $"FullyQualifiedName~{arg.ParentId} & DisplayName~pickleIndex: \"{arg.PickleIndex}\"";
+            case TestFramework.NUnit:
+                return $"{arg.ParentId} & FullyQualifiedName~,\"{arg.PickleIndex}\",null";
+            default:
+                throw new ArgumentOutOfRangeException(nameof(framework), framework, null);
+        }
     }
+}
 
-    private static string? TrimOrNull(string value)
-    {
-        var trimmed = value.Trim();
-        return trimmed.Length > 0 ? trimmed : null;
-    }
+enum TestFramework
+{
+    MsTest,
+    NUnit,
+    XUnit
 }

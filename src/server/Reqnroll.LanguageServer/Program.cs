@@ -14,7 +14,7 @@ using Reqnroll.LanguageServer.Models.TestRunner;
 if (args.Contains("--wait-for-debugger"))
 {
     Console.Error.WriteLine("Waiting for debugger...");
-    Debugger.Launch();
+    //Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
 #endif

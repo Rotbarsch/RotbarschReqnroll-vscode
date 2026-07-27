@@ -1,0 +1,6 @@
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>(FullyQualifiedName~Features.SubFolder.AFeatureWithBooleansInASubfolderFeature.FunWithBool &amp; Name~,"0",null) | (FullyQualifiedName~Features.SubFolder.AFeatureWithBooleansInASubfolderFeature.FunWithBool &amp; Name~,0) | (FullyQualifiedName~Features.SubFolder.AFeatureWithBooleansInASubfolderFeature.FunWithBool &amp; DisplayName~pickleIndex: "0")
+    </TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>
