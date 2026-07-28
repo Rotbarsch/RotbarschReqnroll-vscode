@@ -70,14 +70,21 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
 
             void ReportSingleTestResultToClient(TestInfo test, TestResultInfo info)
             {
-                var message = !string.IsNullOrWhiteSpace(info.ErrorMessage)
-                    ? info.ErrorMessage
-                    : !string.IsNullOrWhiteSpace(info.Messages) ? info.Messages : null;
+                var sb = new StringBuilder();
+
+                if (!string.IsNullOrEmpty(info.ErrorMessage))
+                {
+                    sb.AppendLine(info.ErrorMessage);
+                    sb.AppendLine();
+                }
+
+                sb.Append(info.Messages);
+
                 var testResult = new TestResult
                 {
                     Id = test.Id,
                     Passed = info.Outcome == TestOutcome.Passed,
-                    Message = message,
+                    Message = sb.ToString(),
                 };
                 reported[test.Id] = testResult;
                 onTestCompleted?.Invoke(testResult);
