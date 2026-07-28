@@ -78,6 +78,12 @@ public class ReqnrollTestRunnerService
         {
             return await _testRunner.RunTestsAsync(csProjFilePath, tests, onTestCompleted, cancellationToken);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Let cancellation propagate so the LSP request is reported as cancelled to the
+            // client, instead of being reported as a regular test failure.
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError($"Running tests failed for '{csProjFilePath}': {ex.Message}");

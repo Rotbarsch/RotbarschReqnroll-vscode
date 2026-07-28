@@ -36,6 +36,21 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         _logger = logger;
     }
 
+    private void KillProcessTree(Process process)
+    {
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Failed to kill dotnet test process after cancellation: {ex.Message}");
+        }
+    }
+
     public async Task<IReadOnlyList<TestResult>> RunTestsAsync(
         string csProjFilePath,
         IReadOnlyList<TestInfo> tests,
@@ -156,7 +171,19 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
             process.Start();
             process.BeginOutputReadLine();
             process.BeginErrorReadLine();
-            await process.WaitForExitAsync(cancellationToken);
+
+            try
+            {
+                await process.WaitForExitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // The run was cancelled (e.g. the user clicked "Cancel" in the Test Explorer).
+                // WaitForExitAsync does not kill the process itself, so do that here to avoid
+                // leaving an orphaned `dotnet test` process running in the background.
+                KillProcessTree(process);
+                throw;
+            }
 
             var unreported = tests.Where(t => !reported.ContainsKey(t.Id)).ToList();
             if (unreported.Count > 0)
