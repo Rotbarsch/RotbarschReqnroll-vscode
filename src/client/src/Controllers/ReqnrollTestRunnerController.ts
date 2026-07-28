@@ -52,8 +52,21 @@ export class ReqnrollTestRunnerController {
         // incrementally instead of waiting for the whole batch to finish.
         const runId = this.generateRunId();
         const reportedIds = new Set<string>();
+
+        // Whether the run has already been ended, either normally or because the
+        // user clicked "Cancel". vscode.TestRun methods throw once the run has
+        // ended, so every call site must check this first.
+        let ended = false;
+        const endRun = () => {
+          if (ended) {
+            return;
+          }
+          ended = true;
+          run.end();
+        };
+
         const disposable = this.client.onNotification(TEST_RESULT_NOTIFICATION, (notification: TestResultNotification) => {
-          if (notification.runId !== runId) {
+          if (ended || notification.runId !== runId) {
             return;
           }
 
@@ -66,34 +79,62 @@ export class ReqnrollTestRunnerController {
           this.applyTestResult(leaf, notification.result, run);
         });
 
+        // React to cancellation immediately instead of waiting for the in-flight
+        // LSP request to settle: the underlying `dotnet test` process can take a
+        // while to actually exit, and the Test Explorer's "Cancel" button should
+        // stop the run right away from the user's perspective.
+        //
+        // Note: `run.token` (not the `token` argument passed to the runHandler) is
+        // the one that's specifically triggered by the "Cancel Test Run" button in
+        // the Test Results pane, so that's what we listen to here and forward to
+        // the server (best-effort) so it can abort the running process.
+        const cancelListener = run.token.onCancellationRequested(() => {
+          for (const leaf of allLeaves) {
+            if (reportedIds.has(leaf.id)) {
+              continue;
+            }
+            run.skipped(leaf);
+          }
+          endRun();
+        });
+
         try {
           // Send a single runTests request containing all requested tests,
           // handled together by the language server. Individual results arrive
           // via the notification handler above as each test finishes; the
           // response below is only used as a fallback for any test that wasn't
           // already reported via notification (e.g. older server versions).
-          const results = await this.sendRunTestsRequest(allLeaves, runId);
-          const resultsById = new Map(results.map((result) => [result.id, result]));
+          // The cancellation token is forwarded so that clicking "Cancel" in the
+          // Test Explorer sends an LSP $/cancelRequest, letting the server abort
+          // the underlying `dotnet test` process.
+          const results = await this.sendRunTestsRequest(allLeaves, runId, run.token);
 
-          for (const leaf of allLeaves) {
-            if (reportedIds.has(leaf.id)) {
-              continue;
+          if (!ended) {
+            const resultsById = new Map(results.map((result) => [result.id, result]));
+
+            for (const leaf of allLeaves) {
+              if (reportedIds.has(leaf.id)) {
+                continue;
+              }
+              this.applyTestResult(leaf, resultsById.get(leaf.id), run);
             }
-            this.applyTestResult(leaf, resultsById.get(leaf.id), run);
           }
         } catch (error) {
-          const message = this.formatRequestError(error);
-          for (const leaf of allLeaves) {
-            if (reportedIds.has(leaf.id)) {
-              continue;
+          if (!ended) {
+            const message = this.formatRequestError(error);
+            for (const leaf of allLeaves) {
+              if (reportedIds.has(leaf.id)) {
+                continue;
+              }
+              run.errored(leaf, new vscode.TestMessage(`runTests request failed: ${message}`));
             }
-            run.errored(leaf, new vscode.TestMessage(`runTests request failed: ${message}`));
           }
         } finally {
           disposable.dispose();
+          cancelListener.dispose();
         }
 
-        run.end();
+        endRun();
       },
       true
     );
@@ -146,7 +187,7 @@ export class ReqnrollTestRunnerController {
     return leafTestCases;
   }
 
-  private async sendRunTestsRequest(testItems: vscode.TestItem[], runId: string): Promise<TestResult[]> {
+  private async sendRunTestsRequest(testItems: vscode.TestItem[], runId: string, token: vscode.CancellationToken): Promise<TestResult[]> {
     const tests = testItems.map(item => {
       const testInfo: TestInfo = {
         id: item.id,
@@ -172,7 +213,8 @@ export class ReqnrollTestRunnerController {
 
     return await this.client.sendRequest(
       'rotbarsch.reqnroll/runTests',
-      { tests, runId } as RunTestsParams
+      { tests, runId } as RunTestsParams,
+      token
     ) as TestResult[];
   }
 
