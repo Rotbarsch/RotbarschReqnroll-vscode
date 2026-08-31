@@ -25,4 +25,8 @@ public class TestInfo
     // test's console output line back to this TestInfo.
     [JsonProperty("label")]
     public string? Label { get; set; }
+
+    // We hijack this field to have unescaped display names (relevant for MS Test filter construction)
+    [JsonProperty("description")]
+    public string? Description { get; set; }
 }

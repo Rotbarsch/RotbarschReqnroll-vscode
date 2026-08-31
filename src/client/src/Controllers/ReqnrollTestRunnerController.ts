@@ -193,7 +193,8 @@ export class ReqnrollTestRunnerController {
         id: item.id,
         filePath: this.getFilePath(item),
         isContainer: item.children.size > 0,
-        label: item.label
+        label: item.label,
+        description: item.description
       };
 
       // Extract parentId from tags
