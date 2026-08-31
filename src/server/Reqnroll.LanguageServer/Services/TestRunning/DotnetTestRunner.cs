@@ -291,14 +291,20 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         if (string.IsNullOrWhiteSpace(displayName))
             return null;
 
+        // MSTest: pickle index is last entry before closing bracket: Method(a,b,c,1)
+        // Ensure no null follows - MSTest format has no trailing null
+        var msTestMatch = Regex.Match(displayName, @",(\d+)\)$");
+        if (msTestMatch.Success && int.TryParse(msTestMatch.Groups[^1].Value, out var msTestIndex))
+            return msTestIndex;
+
         // xUnit: named parameter __pickleIndex: "N"
         var xunitMatch = Regex.Match(displayName, @"__pickleIndex\s*:\s*""(\d+)""");
         if (xunitMatch.Success && int.TryParse(xunitMatch.Groups[1].Value, out var xunitIndex))
             return xunitIndex;
 
-        // MSTest/NUnit: pickle index is last (or second-to-last before null) positional parameter
-        var positionalMatch = Regex.Match(displayName, @"\(([^,]+),([^,]+),([^,]+),""?(\d+)""?");
-        if (positionalMatch.Success && int.TryParse(positionalMatch.Groups[^1].Value, out var positionalIndex))
+        // NUnit: quoted index followed by ,null) - most specific form
+        var positionalMatch = Regex.Match(displayName, @"""(\d+)""\s*,\s*null\)$");
+        if (positionalMatch.Success && int.TryParse(positionalMatch.Groups[1].Value, out var positionalIndex))
             return positionalIndex;
 
         return null;
@@ -325,14 +331,28 @@ public sealed class DotnetTestRunner : IDotnetTestRunner
         // No action needed for simple tests (TestMethod, Fact,...)
         if (arg.PickleIndex is null) return arg.Id;
 
-        // DataRow/Theory tests on the other hand require some extra attention.
-
+        // DataRow/Theory tests on the other hand require some extra attention - especially MSTest.
         switch (framework)
         {
             case TestFramework.MsTest:
-                return $"FullyQualifiedName~{arg.ParentId} & Name~,{arg.PickleIndex}";
+                var match = Regex.Match(arg.Description!, @"\[(.+)\]");
+                if (!match.Success)
+                    throw new ArgumentException("No [...] found in input");
+
+                var paramsPart = match.Groups[1].Value;
+
+                // Cleanup the parameters
+                var parameters = paramsPart
+                    .Split(',')
+                    .Select(p => $"{p.Replace("(",@"\(").Replace(")",@"\)").Trim()}");
+                
+                var fullFilter= $@"FullyQualifiedName~{arg.ParentId} & Name~\({string.Join(",",parameters)},{arg.PickleIndex}\)";
+                
+                return fullFilter;
+
             case TestFramework.XUnit:
                 return $"FullyQualifiedName~{arg.ParentId} & DisplayName~pickleIndex: \"{arg.PickleIndex}\"";
+
             case TestFramework.NUnit:
                 return $"{arg.ParentId} & FullyQualifiedName~,\"{arg.PickleIndex}\",null";
             default:

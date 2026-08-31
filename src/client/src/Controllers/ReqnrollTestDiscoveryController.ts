@@ -169,6 +169,7 @@ export class ReqnrollTestDiscoveryController {
 
         // Sanitize label for VS Code Test Explorer: replace all '$(...)' with '{...}'
         let sanitizedLabel = test.label.replace(/\$\(([^)]+)\)/g, '{$1}');
+        item.description = test.label;
         item.label = sanitizedLabel;
         item.range = range;
 
