@@ -55,7 +55,7 @@ jobs:
         working-directory: src/client
         shell: pwsh
         run: |
-          npm version ${{ steps.version.outputs.version }} --no-git-tag-version --alow-same-version
+          npm version ${{ steps.version.outputs.version }} --no-git-tag-version --allow-same-version
 
       # Package extension into vsix
       - name: Install vsce
