@@ -95,8 +95,9 @@ export class ReqnrollTestDiscoveryController {
 
     /**
      * Creates folder hierarchy based on feature ID and adds the feature at the appropriate level.
+     * The folder root segment itself (e.g. "Features") is skipped so it doesn't clutter the tree.
      * Example: For "Example.MsTest.Features.SubFolder.DeepFolder.ClassName"
-     * Creates: Example.MsTest → Features → SubFolder → DeepFolder → [Feature]
+     * Creates: Example.MsTest → SubFolder → DeepFolder → [Feature]
      */
     private createFolderHierarchyAndAddFeature(feature: DiscoveredTest, parent: vscode.TestItemCollection, uri: vscode.Uri): void {
         const parts = feature.id.split('.');
@@ -104,26 +105,26 @@ export class ReqnrollTestDiscoveryController {
         // Find where the folder structure starts (look for common folder root names)
         // Common patterns: Features, Tests, Specs, etc.
         const folderRootNames = ['Features', 'Tests', 'Specs', 'Test', 'Feature', 'Specifications'];
-        let folderStartIndex = -1;
+        let folderRootIndex = -1;
         
         for (let i = 0; i < parts.length - 1; i++) {
             if (folderRootNames.some(name => parts[i].toLowerCase() === name.toLowerCase())) {
-                folderStartIndex = i;
+                folderRootIndex = i;
                 break;
             }
         }
         
-        // If we didn't find a folder root, assume the project is the first part only
-        if (folderStartIndex === -1) {
-            folderStartIndex = 1; // Skip first part (project name)
-        }
+        // Project id ends right before the folder root segment; if none was found, the project is the first part only
+        const projectEndIndex = folderRootIndex === -1 ? 1 : folderRootIndex;
+        // Folder hierarchy nodes start after the folder root segment itself, so it is skipped (not rendered)
+        const folderStartIndex = folderRootIndex === -1 ? 1 : folderRootIndex + 1;
         
         let currentCollection = parent;
         
         // First, create or find the project node (everything before folder root)
-        if (folderStartIndex > 0) {
-            const projectId = parts.slice(0, folderStartIndex).join('.');
-            const projectLabel = parts.slice(0, folderStartIndex).join('.');
+        if (projectEndIndex > 0) {
+            const projectId = parts.slice(0, projectEndIndex).join('.');
+            const projectLabel = parts.slice(0, projectEndIndex).join('.');
             
             let projectItem = currentCollection.get(projectId);
             if (!projectItem) {
@@ -134,7 +135,7 @@ export class ReqnrollTestDiscoveryController {
             currentCollection = projectItem.children;
         }
         
-        // Create folder nodes from folder root to the parent of the class
+        // Create folder nodes for the subfolders nested under the (skipped) folder root
         for (let i = folderStartIndex; i < parts.length - 1; i++) {
             const segmentId = parts.slice(0, i + 1).join('.');
             const segmentLabel = parts[i];
@@ -170,7 +171,7 @@ export class ReqnrollTestDiscoveryController {
         // Sanitize label for VS Code Test Explorer: replace all '$(...)' with '{...}'
         let sanitizedLabel = test.label.replace(/\$\(([^)]+)\)/g, '{$1}');
         item.description = test.label;
-        item.label = sanitizedLabel;
+        item.label = this.buildDisplayName(sanitizedLabel, test);
         item.range = range;
 
         // Store ParentId and PickleIndex as tags for later retrieval
@@ -195,6 +196,22 @@ export class ReqnrollTestDiscoveryController {
                 this.addTestItem(child, item.children);
             }
         }
+    }
+
+    private buildDisplayName(label: string, test: DiscoveredTest): string {
+        const config = vscode.workspace.getConfiguration('rotbarsch.reqnroll');
+        const addTags = config.get<boolean>('testExplorer.addTagsToDisplayName', false);
+        const addFullName = config.get<boolean>('testExplorer.addFullNameToDisplayName', false);
+
+        const suffixes: string[] = [];
+        if (addTags && test.tags.length > 0) {
+            suffixes.push(test.tags.map(tag => `@${tag}`).join(' '));
+        }
+        if (addFullName) {
+            suffixes.push(test.id);
+        }
+
+        return suffixes.length > 0 ? `${label} (${suffixes.join(' | ')})` : label;
     }
 
     private async sendDiscoverTestsRequest(uri: string): Promise<DiscoveredTest[]> {
