@@ -57,6 +57,14 @@ Only Windows for now - sorry.
 - Supports [Reqnroll.xUnit.v3](https://docs.reqnroll.net/latest/integrations/xunit.html)
 - Supports [Reqnroll.NUnit](https://docs.reqnroll.net/latest/integrations/nunit.html) 
 
+## Settings
+Configurable via VS Code settings (`settings.json` or the Settings UI):
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `rotbarsch.reqnroll.testExplorer.addTagsToDisplayName` | `false` | Adds a test's tags (e.g. `@smoke`) to its display name in the Test Explorer. |
+| `rotbarsch.reqnroll.testExplorer.addFullNameToDisplayName` | `false` | Adds the C# full name (namespace, class and method) to a test's display name in the Test Explorer. |
+
 # Debugging
 Open this workspace in VS Code and (my recommendation) the .sln file in Visual Studio. When pressing F5 (using the "Run VS Code Extension") in VS Code, it builds the TypeScript client and C# Language Server Protocol Server in Debug mode. 
 When the server is started in DEBUG configuration, it will try to launch a debugger.

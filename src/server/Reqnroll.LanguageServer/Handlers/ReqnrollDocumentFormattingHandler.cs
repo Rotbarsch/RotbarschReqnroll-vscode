@@ -25,7 +25,7 @@ public class ReqnrollDocumentFormattingHandler : DocumentFormattingHandlerBase
     {
         return new DocumentFormattingRegistrationOptions
         {
-            DocumentSelector = DocumentSelector.ForLanguage("reqnroll-feature")
+            DocumentSelector = TextDocumentSelector.ForLanguage("reqnroll-feature")
         };
     }
 

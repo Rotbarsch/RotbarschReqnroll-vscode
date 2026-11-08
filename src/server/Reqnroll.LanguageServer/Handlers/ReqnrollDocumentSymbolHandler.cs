@@ -22,7 +22,7 @@ public class ReqnrollDocumentSymbolHandler : IDocumentSymbolHandler
     {
         return new DocumentSymbolRegistrationOptions
         {
-            DocumentSelector = new DocumentSelector(new DocumentFilter
+            DocumentSelector = new TextDocumentSelector(new TextDocumentFilter
             {
                 Language = "reqnroll-feature",
                 Pattern = "**/*.feature"

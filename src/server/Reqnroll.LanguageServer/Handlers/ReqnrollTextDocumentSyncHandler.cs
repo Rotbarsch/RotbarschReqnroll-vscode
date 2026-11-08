@@ -34,12 +34,12 @@ public class ReqnrollTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     }
 
     protected override TextDocumentSyncRegistrationOptions CreateRegistrationOptions(
-        SynchronizationCapability capability,
+        TextSynchronizationCapability capability,
         ClientCapabilities clientCapabilities)
     {
         return new TextDocumentSyncRegistrationOptions
         {
-            DocumentSelector = DocumentSelector.ForLanguage("reqnroll-feature"),
+            DocumentSelector = TextDocumentSelector.ForLanguage("reqnroll-feature"),
             Change = TextDocumentSyncKind.Full,
             Save = new SaveOptions { IncludeText = true }
         };
