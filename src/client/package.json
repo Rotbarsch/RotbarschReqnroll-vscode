@@ -44,6 +44,16 @@
     "configuration": {
       "title": "Reqnroll",
       "properties": {
+        "rotbarsch.reqnroll.testExplorer.addTagsToDisplayName": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add tags to the display name of tests in the Test Explorer."
+        },
+        "rotbarsch.reqnroll.testExplorer.addFullNameToDisplayName": {
+          "type": "boolean",
+          "default": false,
+          "description": "Add the C# full name to the display name of tests in the Test Explorer."
+        }
       }
     },
     "commands": [

@@ -1,5 +1,6 @@
 ﻿Feature: A feature with booleans
 
+@boolOutline
 Scenario Outline: Fun with bool
 	When <left> OR <right>
 	Then the result bool should be <result>
