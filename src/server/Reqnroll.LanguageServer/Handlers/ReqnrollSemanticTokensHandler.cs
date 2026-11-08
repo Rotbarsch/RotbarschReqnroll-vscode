@@ -39,7 +39,7 @@ public class ReqnrollSemanticTokensHandler : SemanticTokensHandlerBase
     {
         return new SemanticTokensRegistrationOptions
         {
-            DocumentSelector = DocumentSelector.ForLanguage("reqnroll-feature"),
+            DocumentSelector = TextDocumentSelector.ForLanguage("reqnroll-feature"),
             Legend = Legend,
             Full = true,
             Range = false

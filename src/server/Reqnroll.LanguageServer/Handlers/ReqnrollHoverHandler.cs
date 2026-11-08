@@ -27,7 +27,7 @@ public class ReqnrollHoverHandler : HoverHandlerBase
     {
         return new HoverRegistrationOptions
         {
-            DocumentSelector = DocumentSelector.ForLanguage("reqnroll-feature")
+            DocumentSelector = TextDocumentSelector.ForLanguage("reqnroll-feature")
         };
     }
 

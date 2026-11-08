@@ -29,7 +29,7 @@ public class ReqnrollCompletionHandler : CompletionHandlerBase
     {
         return new CompletionRegistrationOptions
         {
-            DocumentSelector = DocumentSelector.ForLanguage("reqnroll-feature"),
+            DocumentSelector = TextDocumentSelector.ForLanguage("reqnroll-feature"),
             TriggerCharacters = new[] { "G", "W", "T", "A", "B", "F", "S", "E" },
             ResolveProvider = false
         };

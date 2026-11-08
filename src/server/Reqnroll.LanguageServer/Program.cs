@@ -14,7 +14,7 @@ using Reqnroll.LanguageServer.Models.TestRunner;
 if (args.Contains("--wait-for-debugger"))
 {
     Console.Error.WriteLine("Waiting for debugger...");
-    Debugger.Launch();
+    //Debugger.Launch();
     Console.Error.WriteLine("Debugger connected!");
 }
 #endif
@@ -35,7 +35,9 @@ var server = await LanguageServer.From(options =>
             services.AddSingleton<LanguageServerProtocolRequestService>();
             services.AddSingleton<FeatureFileDiagnosticsService>();
             services.AddSingleton<VsCodeOutputLogger>();
-            services.AddSingleton<IDotnetTestRunner, DotnetTestRunner>();
+            services.AddSingleton<DotnetTestRunner>();
+            services.AddSingleton<MtpTestRunner>();
+            services.AddSingleton<IDotnetTestRunner, TestRunnerDispatcher>();
             services.AddSingleton<ReqnrollTestRunnerService>();
             services.AddSingleton<FeatureCsParserService>();
             services.AddSingleton<ReqnrollTestDiscoveryService>();
