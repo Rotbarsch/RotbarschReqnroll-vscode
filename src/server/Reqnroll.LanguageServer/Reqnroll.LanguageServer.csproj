@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
+    <PackageReference Include="Microsoft.Testing.Platform.ServerMode.Client.Sources" Version="2.5.2" PrivateAssets="all" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.11" />
     <PackageReference Include="Rotbarsch.ReqnrollBindingMetadataExtractor" Version="0.0.2" />
